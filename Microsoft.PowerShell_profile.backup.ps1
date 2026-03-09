@@ -12,15 +12,6 @@ if (Test-Path $nvimPath) { if ($env:Path -notlike "*$nvimPath*") { $env:Path += 
 if (Test-Path $nodePath) { if ($env:Path -notlike "*$nodePath*") { $env:Path += ";$nodePath" } }
 if (Test-Path $npmGlobalPath) { if ($env:Path -notlike "*$npmGlobalPath*") { $env:Path += ";$npmGlobalPath" } }
 
-# Centralized function to safely append to PATH
-function Add-ToPathIfNotExists {
-    param([string]$NewPath)
-    if ([string]::IsNullOrWhiteSpace($NewPath)) { return }
-    if ($env:Path -notlike "*$NewPath*") {
-        $env:Path += ";$NewPath"
-    }
-}
-
 $lvimPath = 'C:\Users\OmarRugel\.local\bin\lvim.ps1'
 if (Test-Path $lvimPath) {
     Set-Alias lvim $lvimPath
@@ -148,9 +139,6 @@ if (Test-Path $savedThemeFile) {
 }
 
 $env:Path += ";$env:LOCALAPPDATA\Programs\oh-my-posh\bin"
-
-# Ensure oh-my-posh path uniqueness
-Add-ToPathIfNotExists "$env:LOCALAPPDATA\Programs\oh-my-posh\bin"
 
 #==============================================================================
 # CORE UTILITIES & FZF
