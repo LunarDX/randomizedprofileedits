@@ -1,0 +1,1596 @@
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+
+#ohmyposh
+$themePath = "$env:USERPROFILE\Documents\PowerShell\Themes"
+if (Test-Path $themePath) {
+    $themes = Get-ChildItem -Path $themePath -Filter *.omp.json
+    if ($themes.Count -gt 0) {
+        $randomTheme = $themes | Get-Random
+        $env:POSH_THEME_PATH = $randomTheme.FullName
+        oh-my-posh init pwsh --config $randomTheme.FullName | Invoke-Expression
+    } else {
+        oh-my-posh init pwsh | Invoke-Expression
+    }
+} else {
+    oh-my-posh init pwsh | Invoke-Expression
+}
+$env:Path += ";$env:LOCALAPPDATA\Programs\oh-my-posh\bin"
+
+#==============================================================================
+# AZURE PRODUCTIVITY FUNCTIONS
+#==============================================================================
+
+# Ensure Az modules are loaded
+Import-Module -Name Az.Accounts, Az.Resources, Az.DesktopVirtualization -ErrorAction SilentlyContinue
+
+# Auto-connect if not connected
+function Ensure-AzConnection {
+    $ctx = Get-AzContext -ErrorAction SilentlyContinue
+    if (-not $ctx) {
+        Write-Host "[INFO] Not connected. Running Connect-AzAccount..." -ForegroundColor Yellow
+        Connect-AzAccount -ErrorAction Stop
+    }
+}
+
+#==============================================================================
+# TAB COMPLETION
+#==============================================================================
+
+# Tab completion for AVD host pool names
+Register-ArgumentCompleter -CommandName avd-hosts,avd-health,avd-fslogix,avd-rdp,avd-users,avd-extensions,avd-drain,avd-enable -ParameterName HostPoolName -ScriptBlock {
+    param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+    
+    $pools = Get-AzWvdHostPool -ErrorAction SilentlyContinue
+    
+    $pools | 
+        Where-Object { $_.Name -like "$wordToComplete*" } | 
+        ForEach-Object {
+            [System.Management.Automation.CompletionResult]::new(
+                $_.Name, 
+                $_.Name, 
+                'ParameterValue', 
+                "$($_.Name) ($($_.ResourceGroupName))"
+            )
+        }
+}
+
+# Tab completion for AVD session host names
+Register-ArgumentCompleter -CommandName avd-drain,avd-enable -ParameterName SessionHostName -ScriptBlock {
+    param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+    
+    $hostPool = $fakeBoundParameters['HostPoolName']
+    $rg = $fakeBoundParameters['ResourceGroupName']
+    
+    if ($hostPool -and $rg) {
+        $hosts = Get-AzWvdSessionHost -HostPoolName $hostPool -ResourceGroupName $rg -ErrorAction SilentlyContinue
+        
+        $hosts | 
+            Where-Object { $_.Name -like "*$wordToComplete*" } | 
+            ForEach-Object {
+                $hostName = ($_.Name -split '/')[1]
+                [System.Management.Automation.CompletionResult]::new(
+                    $hostName, 
+                    $hostName, 
+                    'ParameterValue', 
+                    "$hostName ($($_.Status))"
+                )
+            }
+    }
+}
+
+# Tab completion for subscription names
+Register-ArgumentCompleter -CommandName ss -ParameterName Name -ScriptBlock {
+    param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+    
+    if (-not $global:AzSubCache) {
+        $global:AzSubCache = Get-AzSubscription -ErrorAction SilentlyContinue | Sort-Object Name
+    }
+    
+    $global:AzSubCache | 
+        Where-Object { $_.Name -like "$wordToComplete*" } | 
+        ForEach-Object {
+            [System.Management.Automation.CompletionResult]::new(
+                $_.Name, 
+                $_.Name, 
+                'ParameterValue', 
+                $_.Name
+            )
+        }
+}
+
+# Tab completion for resource group names
+Register-ArgumentCompleter -CommandName rgr, rgcount, vmstart, vmstop, vmrestart, vms -ParameterName ResourceGroupName -ScriptBlock {
+    param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+    
+    $rgs = Get-AzResourceGroup -ErrorAction SilentlyContinue
+    
+    $rgs | 
+        Where-Object { $_.ResourceGroupName -like "$wordToComplete*" } | 
+        ForEach-Object {
+            [System.Management.Automation.CompletionResult]::new(
+                $_.ResourceGroupName, 
+                $_.ResourceGroupName, 
+                'ParameterValue', 
+                $_.ResourceGroupName
+            )
+        }
+}
+
+# Tab completion for VM names
+Register-ArgumentCompleter -CommandName vmstart, vmstop, vmrestart -ParameterName Name -ScriptBlock {
+    param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+    
+    $rg = $fakeBoundParameters['ResourceGroupName']
+    
+    if ($rg) {
+        $vms = Get-AzVM -ResourceGroupName $rg -ErrorAction SilentlyContinue
+    } else {
+        $vms = Get-AzVM -ErrorAction SilentlyContinue
+    }
+    
+    $vms | 
+        Where-Object { $_.Name -like "$wordToComplete*" } | 
+        ForEach-Object {
+            [System.Management.Automation.CompletionResult]::new(
+                $_.Name, 
+                $_.Name, 
+                'ParameterValue', 
+                "$($_.Name) ($($_.ResourceGroupName))"
+            )
+        }
+}
+
+# Tab completion for resource names in findres
+Register-ArgumentCompleter -CommandName findres -ParameterName Name -ScriptBlock {
+    param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+    
+    $resources = Get-AzResource -ErrorAction SilentlyContinue
+    
+    $resources | 
+        Where-Object { $_.Name -like "$wordToComplete*" } | 
+        Select-Object -First 20 -Unique Name |
+        ForEach-Object {
+            [System.Management.Automation.CompletionResult]::new(
+                $_.Name, 
+                $_.Name, 
+                'ParameterValue', 
+                $_.Name
+            )
+        }
+}
+
+# Tab completion for resource types
+Register-ArgumentCompleter -CommandName findtype -ParameterName Type -ScriptBlock {
+    param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+    
+    $types = Get-AzResource -ErrorAction SilentlyContinue | 
+        Select-Object -ExpandProperty ResourceType -Unique | 
+        Sort-Object
+    
+    $types | 
+        Where-Object { $_ -like "*$wordToComplete*" } | 
+        ForEach-Object {
+            [System.Management.Automation.CompletionResult]::new(
+                $_, 
+                $_, 
+                'ParameterValue', 
+                $_
+            )
+        }
+}
+
+# Tab completion for tag names
+Register-ArgumentCompleter -CommandName findtag -ParameterName TagName -ScriptBlock {
+    param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+    
+    $tags = Get-AzTag -ErrorAction SilentlyContinue
+    
+    $tags.Name | 
+        Where-Object { $_ -like "$wordToComplete*" } | 
+        ForEach-Object {
+            [System.Management.Automation.CompletionResult]::new(
+                $_, 
+                $_, 
+                'ParameterValue', 
+                $_
+            )
+        }
+}
+
+#==============================================================================
+# CLOUD MANAGEMENT
+#==============================================================================
+
+# SWITCH BETWEEN AZURE CLOUDS (Commercial/Government)
+function azcloud {
+    param(
+        [Parameter(Mandatory=$false)]
+        [ValidateSet('Commercial', 'Government', 'Gov', 'Comm')]
+        [string]$Cloud
+    )
+    
+    $currentEnv = (Get-AzContext -ErrorAction SilentlyContinue).Environment.Name
+    
+    if (-not $Cloud) {
+        # Show current cloud
+        if ($currentEnv -eq 'AzureUSGovernment') {
+            Write-Host "[CLOUD] Azure Government" -ForegroundColor Yellow
+        } elseif ($currentEnv -eq 'AzureCloud') {
+            Write-Host "[CLOUD] Azure Commercial" -ForegroundColor Yellow
+        } else {
+            Write-Host "[CLOUD] $currentEnv" -ForegroundColor Yellow
+        }
+        Write-Host "`nTo switch clouds, use:" -ForegroundColor Gray
+        Write-Host "  azcloud gov  - Switch to Government" -ForegroundColor Gray
+        Write-Host "  azcloud comm - Switch to Commercial" -ForegroundColor Gray
+        return
+    }
+    
+    # Normalize input
+    $targetEnv = switch ($Cloud.ToLower()) {
+        'government' { 'AzureUSGovernment' }
+        'gov' { 'AzureUSGovernment' }
+        'commercial' { 'AzureCloud' }
+        'comm' { 'AzureCloud' }
+    }
+    
+    $friendlyName = if ($targetEnv -eq 'AzureUSGovernment') { 'Azure Government' } else { 'Azure Commercial' }
+    
+    try {
+        Write-Host "[INFO] Switching to $friendlyName..." -ForegroundColor Yellow
+        Connect-AzAccount -Environment $targetEnv -ErrorAction Stop | Out-Null
+        
+        # Clear cache when switching clouds
+        $global:AzSubCache = $null
+        $global:AzSubCacheTime = $null
+        
+        Write-Host "[SUCCESS] Connected to $friendlyName" -ForegroundColor Green
+        
+        # Show available subscriptions
+        $subs = Get-AzSubscription | Sort-Object Name
+        Write-Host "`n[INFO] Available subscriptions ($($subs.Count)):" -ForegroundColor Cyan
+        $subs | Select-Object -First 10 Name | Format-Table -AutoSize
+        
+        if ($subs.Count -gt 10) {
+            Write-Host "... and $($subs.Count - 10) more. Use 'subs' to see all.`n" -ForegroundColor Gray
+        }
+    }
+    catch {
+        Write-Error "Failed to switch: $($_.Exception.Message)"
+    }
+}
+
+#==============================================================================
+# SUBSCRIPTION MANAGEMENT
+#==============================================================================
+
+# FAST SUBSCRIPTION SWITCHING with fuzzy matching
+function ss {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true, Position=0)]
+        [string]$Name
+    )
+    
+    try {
+        Ensure-AzConnection
+
+        # Get current environment for cache key
+        $currentEnv = (Get-AzContext).Environment.Name
+        
+        # Get all subscriptions and cache them (separate cache per environment)
+        if (-not $global:AzSubCache -or $global:AzSubCacheEnv -ne $currentEnv -or ((Get-Date) - $global:AzSubCacheTime).TotalMinutes -gt 30) {
+            Write-Host "[INFO] Refreshing subscription cache..." -ForegroundColor Cyan
+            $global:AzSubCache = Get-AzSubscription -ErrorAction Stop | Sort-Object Name
+            $global:AzSubCacheTime = Get-Date
+            $global:AzSubCacheEnv = $currentEnv
+        }
+
+        # Fuzzy match: exact first, then contains, then starts with
+        $match = $global:AzSubCache | Where-Object { $_.Name -eq $Name } | Select-Object -First 1
+        if (-not $match) {
+            $match = $global:AzSubCache | Where-Object { $_.Name -like "*$Name*" } | Select-Object -First 1
+        }
+
+        if ($match) {
+            $null = Set-AzContext -Subscription $match.Id -ErrorAction Stop
+            Write-Host "[SWITCHED] $($match.Name)" -ForegroundColor Green
+        } else {
+            Write-Host "[ERROR] No match found for: $Name" -ForegroundColor Red
+            Write-Host "[INFO] Available subscriptions:" -ForegroundColor Yellow
+            $global:AzSubCache | Select-Object -First 10 Name | Format-Table -AutoSize
+        }
+    }
+    catch {
+        Write-Error "Error: $($_.Exception.Message)"
+    }
+}
+
+# SWITCH BY NUMBER (for faster switching when listing)
+function ssn {
+    param(
+        [Parameter(Mandatory=$true)]
+        [int]$Number
+    )
+    
+    if (-not $global:AzSubCache) {
+        Write-Host "[ERROR] No subscription cache. Run 'subs' first." -ForegroundColor Red
+        return
+    }
+    
+    if ($Number -lt 1 -or $Number -gt $global:AzSubCache.Count) {
+        Write-Host "[ERROR] Invalid number. Must be between 1 and $($global:AzSubCache.Count)" -ForegroundColor Red
+        return
+    }
+    
+    $sub = $global:AzSubCache[$Number - 1]
+    $null = Set-AzContext -Subscription $sub.Id -ErrorAction Stop
+    Write-Host "[SWITCHED] $($sub.Name)" -ForegroundColor Green
+}
+
+# LIST ALL SUBSCRIPTIONS with search and numbering
+function subs {
+    param([string]$Filter = "")
+    
+    $currentEnv = (Get-AzContext -ErrorAction SilentlyContinue).Environment.Name
+    
+    if (-not $global:AzSubCache -or $global:AzSubCacheEnv -ne $currentEnv -or ((Get-Date) - $global:AzSubCacheTime).TotalMinutes -gt 30) {
+        $global:AzSubCache = Get-AzSubscription | Sort-Object Name
+        $global:AzSubCacheTime = Get-Date
+        $global:AzSubCacheEnv = $currentEnv
+    }
+    
+    $filtered = if ($Filter) {
+        $global:AzSubCache | Where-Object { $_.Name -like "*$Filter*" }
+    } else {
+        $global:AzSubCache
+    }
+    
+    # Add index for easy switching
+    $i = 0
+    $filtered | ForEach-Object {
+        $i++
+        [PSCustomObject]@{
+            '#' = $i
+            Name = $_.Name
+            Id = $_.Id
+            State = $_.State
+        }
+    } | Format-Table -AutoSize
+    
+    Write-Host "[TIP] Use 'ssn <number>' to switch by number" -ForegroundColor Gray
+}
+
+# SHOW CURRENT SUBSCRIPTION
+function sub {
+    $ctx = Get-AzContext
+    if ($ctx) {
+        Write-Host "[CURRENT] $($ctx.Subscription.Name)" -ForegroundColor Cyan
+    } else {
+        Write-Host "[ERROR] Not connected to Azure" -ForegroundColor Red
+    }
+}
+
+# SHOW RECENT SUBSCRIPTIONS
+function recent {
+    if (-not $global:RecentSubs) {
+        $global:RecentSubs = @()
+    }
+    
+    if ($global:RecentSubs.Count -eq 0) {
+        Write-Host "[INFO] No recent subscriptions" -ForegroundColor Yellow
+        return
+    }
+    
+    Write-Host "`n[RECENT SUBSCRIPTIONS]" -ForegroundColor Cyan
+    $global:RecentSubs | ForEach-Object { 
+        Write-Host "  $_" -ForegroundColor White 
+    }
+    Write-Host ""
+}
+
+# Track recent subscriptions (hook into ss function)
+$global:RecentSubs = @()
+function Add-RecentSub {
+    param([string]$SubName)
+    
+    if (-not $global:RecentSubs) {
+        $global:RecentSubs = @()
+    }
+    
+    # Remove if already exists
+    $global:RecentSubs = $global:RecentSubs | Where-Object { $_ -ne $SubName }
+    
+    # Add to front
+    $global:RecentSubs = @($SubName) + $global:RecentSubs
+    
+    # Keep only last 5
+    if ($global:RecentSubs.Count -gt 5) {
+        $global:RecentSubs = $global:RecentSubs[0..4]
+    }
+}
+
+#==============================================================================
+# RESOURCE GROUP OPERATIONS
+#==============================================================================
+
+# FAST RESOURCE GROUP LISTING
+function rg {
+    param([string]$Filter = "")
+    
+    try {
+        $rgs = Get-AzResourceGroup -ErrorAction Stop
+        
+        if ($Filter) {
+            $rgs = $rgs | Where-Object { $_.ResourceGroupName -like "*$Filter*" }
+        }
+        
+        $rgs | Select-Object ResourceGroupName, Location, ProvisioningState | 
+            Sort-Object ResourceGroupName | Format-Table -AutoSize
+        
+        Write-Host "[TOTAL] $($rgs.Count) resource groups" -ForegroundColor Cyan
+    }
+    catch {
+        Write-Error "Error listing resource groups: $($_.Exception.Message)"
+    }
+}
+
+# GET RESOURCES IN A RESOURCE GROUP
+function rgr {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$ResourceGroupName
+    )
+    
+    try {
+        $resources = Get-AzResource -ResourceGroupName $ResourceGroupName -ErrorAction Stop
+        $resources | Select-Object Name, ResourceType, Location | 
+            Sort-Object ResourceType, Name | Format-Table -AutoSize
+        Write-Host "[TOTAL] $($resources.Count) resources" -ForegroundColor Cyan
+    }
+    catch {
+        Write-Error "Error: $($_.Exception.Message)"
+    }
+}
+
+# COUNT RESOURCES BY TYPE IN RESOURCE GROUP
+function rgcount {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$ResourceGroupName
+    )
+    
+    try {
+        $resources = Get-AzResource -ResourceGroupName $ResourceGroupName -ErrorAction Stop
+        $resources | Group-Object ResourceType | 
+            Select-Object @{N='Type';E={$_.Name}}, Count | 
+            Sort-Object Count -Descending | 
+            Format-Table -AutoSize
+    }
+    catch {
+        Write-Error "Error: $($_.Exception.Message)"
+    }
+}
+
+#==============================================================================
+# RESOURCE SEARCH & DISCOVERY
+#==============================================================================
+
+# SEARCH RESOURCES ACROSS CURRENT SUBSCRIPTION
+function findres {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$Name
+    )
+    
+    Write-Host "[SEARCHING] Resources matching: $Name" -ForegroundColor Yellow
+    $resources = Get-AzResource | Where-Object { $_.Name -like "*$Name*" }
+    $resources | Select-Object Name, ResourceGroupName, ResourceType, Location | 
+        Format-Table -AutoSize
+    Write-Host "[FOUND] $($resources.Count) resources" -ForegroundColor Cyan
+}
+
+# FIND RESOURCES BY TYPE
+function findtype {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$Type
+    )
+    
+    Write-Host "[SEARCHING] Resources of type: $Type" -ForegroundColor Yellow
+    $resources = Get-AzResource | Where-Object { $_.ResourceType -like "*$Type*" }
+    $resources | Select-Object Name, ResourceGroupName, ResourceType, Location | 
+        Format-Table -AutoSize
+    Write-Host "[FOUND] $($resources.Count) resources" -ForegroundColor Cyan
+}
+
+# LIST ALL RESOURCE TYPES IN SUBSCRIPTION
+function restypes {
+    Write-Host "[INFO] Fetching resource types..." -ForegroundColor Yellow
+    $types = Get-AzResource | Group-Object ResourceType | 
+        Select-Object @{N='ResourceType';E={$_.Name}}, Count | 
+        Sort-Object Count -Descending
+    $types | Format-Table -AutoSize
+    Write-Host "[TOTAL] $($types.Count) unique resource types" -ForegroundColor Cyan
+}
+
+#==============================================================================
+# AVD (AZURE VIRTUAL DESKTOP) OPERATIONS
+#==============================================================================
+
+# LIST ALL HOST POOLS
+function avd-pools {
+    param([string]$Filter = "")
+    
+    Write-Host "[INFO] Fetching AVD host pools..." -ForegroundColor Yellow
+    
+    try {
+        $pools = Get-AzWvdHostPool -ErrorAction Stop
+        
+        if ($Filter) {
+            $pools = $pools | Where-Object { $_.Name -like "*$Filter*" }
+        }
+        
+        $pools | Select-Object Name, ResourceGroupName, Location, HostPoolType, LoadBalancerType, MaxSessionLimit, 
+            @{N='ValidationEnvironment';E={$_.ValidationEnvironment}}, 
+            @{N='RegistrationTokenExpiration';E={$_.RegistrationInfoExpirationTime}} | 
+            Format-Table -AutoSize
+        
+        Write-Host "[TOTAL] $($pools.Count) host pools" -ForegroundColor Cyan
+    }
+    catch {
+        Write-Error "Error listing host pools: $($_.Exception.Message)"
+        Write-Host "[TIP] Ensure Az.DesktopVirtualization module is installed: Install-Module Az.DesktopVirtualization" -ForegroundColor Yellow
+    }
+}
+
+# LIST SESSION HOSTS IN A HOST POOL
+function avd-hosts {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$HostPoolName,
+        [Parameter(Mandatory=$true)]
+        [string]$ResourceGroupName
+    )
+    
+    Write-Host "[INFO] Fetching session hosts for: $HostPoolName" -ForegroundColor Yellow
+    
+    try {
+        $hosts = Get-AzWvdSessionHost -HostPoolName $HostPoolName -ResourceGroupName $ResourceGroupName -ErrorAction Stop
+        
+        $hosts | Select-Object Name, 
+            @{N='Status';E={$_.Status}},
+            @{N='Sessions';E={$_.Session}},
+            @{N='AllowNewSession';E={$_.AllowNewSession}},
+            @{N='AgentVersion';E={$_.AgentVersion}},
+            @{N='LastHeartBeat';E={$_.LastHeartBeat}},
+            @{N='UpdateState';E={$_.UpdateState}} | 
+            Format-Table -AutoSize
+        
+        Write-Host "[TOTAL] $($hosts.Count) session hosts" -ForegroundColor Cyan
+    }
+    catch {
+        Write-Error "Error: $($_.Exception.Message)"
+    }
+}
+
+# COMPREHENSIVE AVD HEALTH CHECK FOR A HOST POOL
+function avd-health {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$HostPoolName,
+        [Parameter(Mandatory=$true)]
+        [string]$ResourceGroupName,
+        [switch]$Detailed
+    )
+    
+    Write-Host "`n========================================" -ForegroundColor Cyan
+    Write-Host "AVD HEALTH CHECK: $HostPoolName" -ForegroundColor Cyan
+    Write-Host "========================================`n" -ForegroundColor Cyan
+    
+    try {
+        # Get Host Pool Info
+        Write-Host "[1/5] Checking Host Pool Configuration..." -ForegroundColor Yellow
+        $pool = Get-AzWvdHostPool -Name $HostPoolName -ResourceGroupName $ResourceGroupName -ErrorAction Stop
+        
+        Write-Host "  Host Pool Type: $($pool.HostPoolType)" -ForegroundColor White
+        Write-Host "  Load Balancer: $($pool.LoadBalancerType)" -ForegroundColor White
+        Write-Host "  Max Session Limit: $($pool.MaxSessionLimit)" -ForegroundColor White
+        Write-Host "  Validation Env: $($pool.ValidationEnvironment)" -ForegroundColor White
+        
+        if ($pool.RegistrationInfoExpirationTime) {
+            $expiry = [DateTime]$pool.RegistrationInfoExpirationTime
+            $daysUntilExpiry = ($expiry - (Get-Date)).Days
+            if ($daysUntilExpiry -lt 0) {
+                Write-Host "  Registration Token: EXPIRED" -ForegroundColor Red
+            } elseif ($daysUntilExpiry -lt 7) {
+                Write-Host "  Registration Token: Expires in $daysUntilExpiry days" -ForegroundColor Yellow
+            } else {
+                Write-Host "  Registration Token: Valid ($daysUntilExpiry days remaining)" -ForegroundColor Green
+            }
+        }
+        
+        # Get Session Hosts
+        Write-Host "`n[2/5] Checking Session Hosts..." -ForegroundColor Yellow
+        $hosts = Get-AzWvdSessionHost -HostPoolName $HostPoolName -ResourceGroupName $ResourceGroupName -ErrorAction Stop
+        
+        $availableHosts = ($hosts | Where-Object { $_.Status -eq 'Available' }).Count
+        $unavailableHosts = ($hosts | Where-Object { $_.Status -ne 'Available' }).Count
+        $drainingHosts = ($hosts | Where-Object { $_.AllowNewSession -eq $false }).Count
+        
+        Write-Host "  Total Hosts: $($hosts.Count)" -ForegroundColor White
+        Write-Host "  Available: $availableHosts" -ForegroundColor Green
+        Write-Host "  Unavailable: $unavailableHosts" -ForegroundColor $(if($unavailableHosts -gt 0){'Red'}else{'Green'})
+        Write-Host "  Draining: $drainingHosts" -ForegroundColor $(if($drainingHosts -gt 0){'Yellow'}else{'White'})
+        
+        # Check for outdated agents
+        $outdatedAgents = $hosts | Where-Object { 
+            $_.UpdateState -ne 'Succeeded' -or 
+            [version]$_.AgentVersion -lt [version]"1.0.4800.0" 
+        }
+        
+        if ($outdatedAgents.Count -gt 0) {
+            Write-Host "  WARNING: $($outdatedAgents.Count) hosts with outdated/failed agents" -ForegroundColor Red
+            if ($Detailed) {
+                $outdatedAgents | Select-Object Name, AgentVersion, UpdateState | Format-Table -AutoSize
+            }
+        }
+        
+        # Check heartbeats
+        $staleHeartbeats = $hosts | Where-Object { 
+            $_.LastHeartBeat -and ((Get-Date) - [DateTime]$_.LastHeartBeat).TotalMinutes -gt 10 
+        }
+        
+        if ($staleHeartbeats.Count -gt 0) {
+            Write-Host "  WARNING: $($staleHeartbeats.Count) hosts with stale heartbeats (>10 min)" -ForegroundColor Red
+            if ($Detailed) {
+                $staleHeartbeats | Select-Object Name, LastHeartBeat | Format-Table -AutoSize
+            }
+        }
+        
+        # Get Active Sessions
+        Write-Host "`n[3/5] Checking User Sessions..." -ForegroundColor Yellow
+        $sessions = Get-AzWvdUserSession -HostPoolName $HostPoolName -ResourceGroupName $ResourceGroupName -ErrorAction Stop
+        
+        $activeSessions = ($sessions | Where-Object { $_.SessionState -eq 'Active' }).Count
+        $disconnectedSessions = ($sessions | Where-Object { $_.SessionState -eq 'Disconnected' }).Count
+        
+        Write-Host "  Total Sessions: $($sessions.Count)" -ForegroundColor White
+        Write-Host "  Active: $activeSessions" -ForegroundColor Green
+        Write-Host "  Disconnected: $disconnectedSessions" -ForegroundColor $(if($disconnectedSessions -gt 0){'Yellow'}else{'White'})
+        
+        if ($Detailed -and $sessions.Count -gt 0) {
+            $sessions | Select-Object UserPrincipalName, SessionState, 
+                @{N='Host';E={($_.Name -split '/')[1]}},
+                CreateTime | Format-Table -AutoSize
+        }
+        
+        # Check Application Groups
+        Write-Host "`n[4/5] Checking Application Groups..." -ForegroundColor Yellow
+        $appGroups = Get-AzWvdApplicationGroup -ResourceGroupName $ResourceGroupName -ErrorAction SilentlyContinue | 
+            Where-Object { $_.HostPoolArmPath -like "*$HostPoolName*" }
+        
+        Write-Host "  Application Groups: $($appGroups.Count)" -ForegroundColor White
+        
+        if ($Detailed -and $appGroups.Count -gt 0) {
+            foreach ($ag in $appGroups) {
+                Write-Host "    - $($ag.Name) ($($ag.ApplicationGroupType))" -ForegroundColor Gray
+                
+                # Get assignments
+                $assignments = Get-AzRoleAssignment -Scope $ag.Id -ErrorAction SilentlyContinue | 
+                    Where-Object { $_.RoleDefinitionName -eq 'Desktop Virtualization User' }
+                Write-Host "      Assigned Users/Groups: $($assignments.Count)" -ForegroundColor Gray
+            }
+        }
+        
+        # Check VM Extensions (requires VMs to be in same subscription)
+        Write-Host "`n[5/5] Checking VM Extensions..." -ForegroundColor Yellow
+        
+        $vmIssues = 0
+        foreach ($host in $hosts) {
+            $vmName = ($host.Name -split '/')[1] -replace '\..*',''
+            
+            try {
+                $vm = Get-AzVM -Name $vmName -ErrorAction SilentlyContinue
+                
+                if ($vm) {
+                    $extensions = Get-AzVMExtension -ResourceGroupName $vm.ResourceGroupName -VMName $vm.Name -ErrorAction SilentlyContinue
+                    
+                    $failedExtensions = $extensions | Where-Object { $_.ProvisioningState -ne 'Succeeded' }
+                    
+                    if ($failedExtensions.Count -gt 0) {
+                        $vmIssues++
+                        Write-Host "  WARNING: $vmName has $($failedExtensions.Count) failed extension(s)" -ForegroundColor Red
+                        
+                        if ($Detailed) {
+                            $failedExtensions | Select-Object Name, ProvisioningState, TypeHandlerVersion | Format-Table -AutoSize
+                        }
+                    }
+                }
+            }
+            catch {
+                # VM might be in different RG or subscription
+            }
+        }
+        
+        if ($vmIssues -eq 0) {
+            Write-Host "  All accessible VM extensions: OK" -ForegroundColor Green
+        } else {
+            Write-Host "  Total VMs with extension issues: $vmIssues" -ForegroundColor Red
+        }
+        
+        # Summary
+        Write-Host "`n========================================" -ForegroundColor Cyan
+        Write-Host "HEALTH CHECK SUMMARY" -ForegroundColor Cyan
+        Write-Host "========================================" -ForegroundColor Cyan
+        
+        $issueCount = 0
+        if ($unavailableHosts -gt 0) { $issueCount++; Write-Host "  [!] Unavailable hosts detected" -ForegroundColor Red }
+        if ($outdatedAgents.Count -gt 0) { $issueCount++; Write-Host "  [!] Outdated agents detected" -ForegroundColor Red }
+        if ($staleHeartbeats.Count -gt 0) { $issueCount++; Write-Host "  [!] Stale heartbeats detected" -ForegroundColor Red }
+        if ($vmIssues -gt 0) { $issueCount++; Write-Host "  [!] VM extension issues detected" -ForegroundColor Red }
+        if ($pool.RegistrationInfoExpirationTime -and ([DateTime]$pool.RegistrationInfoExpirationTime - (Get-Date)).Days -lt 0) { 
+            $issueCount++; Write-Host "  [!] Registration token expired" -ForegroundColor Red 
+        }
+        
+        if ($issueCount -eq 0) {
+            Write-Host "  [OK] No issues detected" -ForegroundColor Green
+        } else {
+            Write-Host "`n  Total Issues: $issueCount" -ForegroundColor Red
+            Write-Host "  Run with -Detailed flag for more information" -ForegroundColor Yellow
+        }
+        
+        Write-Host "`n"
+    }
+    catch {
+        Write-Error "Error during health check: $($_.Exception.Message)"
+    }
+}
+
+# CHECK FSLOGIX REGISTRY ON SESSION HOSTS
+function avd-fslogix {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$HostPoolName,
+        [Parameter(Mandatory=$true)]
+        [string]$ResourceGroupName,
+        [string]$SessionHostName = ""
+    )
+    
+    Write-Host "[INFO] Checking FSLogix configuration..." -ForegroundColor Yellow
+    Write-Host "[WARNING] This requires Invoke-AzVMRunCommand which may take time" -ForegroundColor Yellow
+    
+    try {
+        $hosts = Get-AzWvdSessionHost -HostPoolName $HostPoolName -ResourceGroupName $ResourceGroupName -ErrorAction Stop
+        
+        if ($SessionHostName) {
+            $hosts = $hosts | Where-Object { $_.Name -like "*$SessionHostName*" }
+        }
+        
+        foreach ($hostObj in $hosts) {
+            $vmName = ($hostObj.Name -split '/')[1] -replace '\..*',''
+            Write-Host "`n[HOST] $vmName" -ForegroundColor Cyan
+            
+            try {
+                $vm = Get-AzVM -Name $vmName -ErrorAction SilentlyContinue
+                
+                if (-not $vm) {
+                    Write-Host "  [ERROR] VM not found in current subscription" -ForegroundColor Red
+                    continue
+                }
+                
+                # Create PowerShell script to check registry
+                $scriptContent = @"
+`$results = @{}
+`$results['Enabled'] = (Get-ItemProperty -Path 'HKLM:\SOFTWARE\FSLogix\Profiles' -Name 'Enabled' -ErrorAction SilentlyContinue).Enabled
+`$results['VHDLocations'] = (Get-ItemProperty -Path 'HKLM:\SOFTWARE\FSLogix\Profiles' -Name 'VHDLocations' -ErrorAction SilentlyContinue).VHDLocations
+`$results['SizeInMBs'] = (Get-ItemProperty -Path 'HKLM:\SOFTWARE\FSLogix\Profiles' -Name 'SizeInMBs' -ErrorAction SilentlyContinue).SizeInMBs
+`$results['DeleteLocalProfileWhenVHDShouldApply'] = (Get-ItemProperty -Path 'HKLM:\SOFTWARE\FSLogix\Profiles' -Name 'DeleteLocalProfileWhenVHDShouldApply' -ErrorAction SilentlyContinue).DeleteLocalProfileWhenVHDShouldApply
+`$results['FlipFlopProfileDirectoryName'] = (Get-ItemProperty -Path 'HKLM:\SOFTWARE\FSLogix\Profiles' -Name 'FlipFlopProfileDirectoryName' -ErrorAction SilentlyContinue).FlipFlopProfileDirectoryName
+`$results | ConvertTo-Json
+"@
+                
+                $result = Invoke-AzVMRunCommand -ResourceGroupName $vm.ResourceGroupName -VMName $vm.Name -CommandId 'RunPowerShellScript' -ScriptString $scriptContent -ErrorAction Stop
+                
+                if ($result.Value[0].Message) {
+                    $fslogixConfig = $result.Value[0].Message | ConvertFrom-Json
+                    
+                    if ($fslogixConfig.Enabled -eq 1) {
+                        Write-Host "  FSLogix Enabled: YES" -ForegroundColor Green
+                    } else {
+                        Write-Host "  FSLogix Enabled: NO" -ForegroundColor Red
+                    }
+                    
+                    Write-Host "  VHD Locations: $($fslogixConfig.VHDLocations)" -ForegroundColor White
+                    Write-Host "  Size (MB): $($fslogixConfig.SizeInMBs)" -ForegroundColor White
+                    Write-Host "  Delete Local Profile: $($fslogixConfig.DeleteLocalProfileWhenVHDShouldApply)" -ForegroundColor White
+                    Write-Host "  Flip Flop Directory: $($fslogixConfig.FlipFlopProfileDirectoryName)" -ForegroundColor White
+                }
+                
+            }
+            catch {
+                Write-Host "  [ERROR] Failed to check FSLogix: $($_.Exception.Message)" -ForegroundColor Red
+            }
+        }
+    }
+    catch {
+        Write-Error "Error: $($_.Exception.Message)"
+    }
+}
+
+# CHECK RDP PROPERTIES
+function avd-rdp {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$HostPoolName,
+        [Parameter(Mandatory=$true)]
+        [string]$ResourceGroupName
+    )
+    
+    Write-Host "[INFO] Fetching RDP properties for: $HostPoolName" -ForegroundColor Yellow
+    
+    try {
+        $pool = Get-AzWvdHostPool -Name $HostPoolName -ResourceGroupName $ResourceGroupName -ErrorAction Stop
+        
+        Write-Host "`n[RDP PROPERTIES]" -ForegroundColor Cyan
+        
+        if ($pool.CustomRdpProperty) {
+            $rdpProps = $pool.CustomRdpProperty -split ';' | Where-Object { $_ }
+            
+            foreach ($prop in $rdpProps) {
+                Write-Host "  $prop" -ForegroundColor White
+            }
+        } else {
+            Write-Host "  No custom RDP properties configured" -ForegroundColor Yellow
+        }
+        
+        Write-Host "`n[COMMON RDP SETTINGS TO VERIFY]" -ForegroundColor Gray
+        Write-Host "  - audiocapturemode:i:1 (Enable microphone redirection)" -ForegroundColor Gray
+        Write-Host "  - audiomode:i:0 (Play sound on remote computer)" -ForegroundColor Gray
+        Write-Host "  - drivestoredirect:s:* (Redirect all drives)" -ForegroundColor Gray
+        Write-Host "  - redirectclipboard:i:1 (Enable clipboard redirection)" -ForegroundColor Gray
+        Write-Host "  - redirectprinters:i:1 (Enable printer redirection)" -ForegroundColor Gray
+        Write-Host "  - devicestoredirect:s:* (Redirect all devices)" -ForegroundColor Gray
+        Write-Host "  - enablecredsspsupport:i:1 (Enable CredSSP)" -ForegroundColor Gray
+        
+    }
+    catch {
+        Write-Error "Error: $($_.Exception.Message)"
+    }
+}
+
+# LIST USER ASSIGNMENTS FOR HOST POOL
+function avd-users {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$HostPoolName,
+        [Parameter(Mandatory=$true)]
+        [string]$ResourceGroupName
+    )
+    
+    Write-Host "[INFO] Fetching user assignments for: $HostPoolName" -ForegroundColor Yellow
+    
+    try {
+        $appGroups = Get-AzWvdApplicationGroup -ResourceGroupName $ResourceGroupName -ErrorAction Stop | 
+            Where-Object { $_.HostPoolArmPath -like "*$HostPoolName*" }
+        
+        if ($appGroups.Count -eq 0) {
+            Write-Host "[WARNING] No application groups found for this host pool" -ForegroundColor Yellow
+            return
+        }
+        
+        foreach ($ag in $appGroups) {
+            Write-Host "`n[APPLICATION GROUP] $($ag.Name) ($($ag.ApplicationGroupType))" -ForegroundColor Cyan
+            
+            $assignments = Get-AzRoleAssignment -Scope $ag.Id -ErrorAction SilentlyContinue | 
+                Where-Object { $_.RoleDefinitionName -eq 'Desktop Virtualization User' }
+            
+            if ($assignments.Count -eq 0) {
+                Write-Host "  No users/groups assigned" -ForegroundColor Yellow
+            } else {
+                $assignments | Select-Object DisplayName, SignInName, ObjectType | Format-Table -AutoSize
+            }
+        }
+    }
+    catch {
+        Write-Error "Error: $($_.Exception.Message)"
+    }
+}
+
+# CHECK VM EXTENSIONS STATUS
+function avd-extensions {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$HostPoolName,
+        [Parameter(Mandatory=$true)]
+        [string]$ResourceGroupName
+    )
+    
+    Write-Host "[INFO] Checking VM extensions for host pool: $HostPoolName" -ForegroundColor Yellow
+    
+    try {
+        $hosts = Get-AzWvdSessionHost -HostPoolName $HostPoolName -ResourceGroupName $ResourceGroupName -ErrorAction Stop
+        
+        foreach ($hostObj in $hosts) {
+            $vmName = ($hostObj.Name -split '/')[1] -replace '\..*',''
+            
+            try {
+                $vm = Get-AzVM -Name $vmName -ErrorAction SilentlyContinue
+                if ($vm) {
+                    $extensions = Get-AzVMExtension -ResourceGroupName $vm.ResourceGroupName -VMName $vm.Name -ErrorAction SilentlyContinue
+                    $failedExtensions = $extensions | Where-Object { $_.ProvisioningState -ne 'Succeeded' }
+                    
+                    if ($failedExtensions.Count -gt 0) {
+                        Write-Host "  WARNING: $vmName has $($failedExtensions.Count) failed extension(s)" -ForegroundColor Red
+                        $failedExtensions | Select-Object Name, ProvisioningState, TypeHandlerVersion | Format-Table -AutoSize
+                    } else {
+                        Write-Host "  [OK] $vmName" -ForegroundColor Green
+                    }
+                }
+            } catch {
+                 Write-Host "  [ERROR] Could not check $vmName" -ForegroundColor Red
+            }
+        }
+    }
+    catch {
+        Write-Error "Error: $($_.Exception.Message)"
+    }
+}
+
+# DRAIN SESSION HOST (prevent new sessions)
+function avd-drain {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$HostPoolName,
+        [Parameter(Mandatory=$true)]
+        [string]$ResourceGroupName,
+        [Parameter(Mandatory=$true)]
+        [string]$SessionHostName
+    )
+    
+    Write-Host "[INFO] Setting host to drain mode: $SessionHostName" -ForegroundColor Yellow
+    
+    try {
+        Update-AzWvdSessionHost -HostPoolName $HostPoolName -ResourceGroupName $ResourceGroupName `
+            -Name $SessionHostName -AllowNewSession:$false -ErrorAction Stop
+        
+        Write-Host "[SUCCESS] Host set to drain mode (no new sessions allowed)" -ForegroundColor Green
+    }
+    catch {
+        Write-Error "Error: $($_.Exception.Message)"
+    }
+}
+
+# ENABLE SESSION HOST (allow new sessions)
+function avd-enable {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$HostPoolName,
+        [Parameter(Mandatory=$true)]
+        [string]$ResourceGroupName,
+        [Parameter(Mandatory=$true)]
+        [string]$SessionHostName
+    )
+    
+    Write-Host "[INFO] Enabling host for new sessions: $SessionHostName" -ForegroundColor Yellow
+    
+    try {
+        Update-AzWvdSessionHost -HostPoolName $HostPoolName -ResourceGroupName $ResourceGroupName `
+            -Name $SessionHostName -AllowNewSession:$true -ErrorAction Stop
+        
+        Write-Host "[SUCCESS] Host enabled (new sessions allowed)" -ForegroundColor Green
+    }
+    catch {
+        Write-Error "Error: $($_.Exception.Message)"
+    }
+}
+
+# QUICK AVD DASHBOARD
+function avd-dashboard {
+    Write-Host "`n" -NoNewline
+    Write-Host "═══════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host "          AVD ENVIRONMENT DASHBOARD                                " -ForegroundColor Cyan
+    Write-Host "═══════════════════════════════════════════════════════════════════`n" -ForegroundColor Cyan
+    
+    try {
+        $pools = Get-AzWvdHostPool -ErrorAction Stop
+        
+        Write-Host "[SUBSCRIPTION] $((Get-AzContext).Subscription.Name)`n" -ForegroundColor Yellow
+        
+        foreach ($pool in $pools) {
+            Write-Host "[POOL] $($pool.Name)" -ForegroundColor Cyan
+            Write-Host "  Resource Group: $($pool.ResourceGroupName)" -ForegroundColor Gray
+            Write-Host "  Type: $($pool.HostPoolType) | Load Balancer: $($pool.LoadBalancerType)" -ForegroundColor Gray
+            
+            # Get hosts
+            $hosts = Get-AzWvdSessionHost -HostPoolName $pool.Name -ResourceGroupName $pool.ResourceGroupName -ErrorAction SilentlyContinue
+            $availableHosts = ($hosts | Where-Object { $_.Status -eq 'Available' }).Count
+            $totalHosts = $hosts.Count
+            
+            Write-Host "  Hosts: $availableHosts/$totalHosts available" -ForegroundColor $(if($availableHosts -eq $totalHosts){'Green'}else{'Yellow'})
+            
+            # Get sessions
+            $sessions = Get-AzWvdUserSession -HostPoolName $pool.Name -ResourceGroupName $pool.ResourceGroupName -ErrorAction SilentlyContinue
+            $activeSessions = ($sessions | Where-Object { $_.SessionState -eq 'Active' }).Count
+            
+            Write-Host "  Active Sessions: $activeSessions" -ForegroundColor White
+            Write-Host ""
+        }
+        
+        Write-Host "[TIP] Use 'avd-health <pool> <rg> -Detailed' for full health check" -ForegroundColor Gray
+        Write-Host ""
+    }
+    catch {
+        Write-Error "Error generating dashboard: $($_.Exception.Message)"
+    }
+}
+
+# QUICK VM STATUS
+function vms {
+    param([string]$ResourceGroupName = "")
+    
+    Write-Host "[INFO] Fetching VM status..." -ForegroundColor Yellow
+    
+    if ($ResourceGroupName) {
+        $vms = Get-AzVM -ResourceGroupName $ResourceGroupName -Status
+    } else {
+        $vms = Get-AzVM -Status
+    }
+    
+    $vms | Select-Object Name, ResourceGroupName, Location, PowerState | 
+        Sort-Object PowerState, Name | Format-Table -AutoSize
+    Write-Host "[TOTAL] $($vms.Count) VMs" -ForegroundColor Cyan
+}
+
+# START VM
+function vmstart {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$Name,
+        [Parameter(Mandatory=$true)]
+        [string]$ResourceGroupName
+    )
+    
+    Write-Host "[INFO] Starting VM: $Name" -ForegroundColor Yellow
+    Start-AzVM -Name $Name -ResourceGroupName $ResourceGroupName -NoWait
+    Write-Host "[SUCCESS] Start command sent" -ForegroundColor Green
+}
+
+# STOP VM
+function vmstop {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$Name,
+        [Parameter(Mandatory=$true)]
+        [string]$ResourceGroupName
+    )
+    
+    Write-Host "[INFO] Stopping VM: $Name" -ForegroundColor Yellow
+    Stop-AzVM -Name $Name -ResourceGroupName $ResourceGroupName -Force -NoWait
+    Write-Host "[SUCCESS] Stop command sent" -ForegroundColor Green
+}
+
+# RESTART VM
+function vmrestart {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$Name,
+        [Parameter(Mandatory=$true)]
+        [string]$ResourceGroupName
+    )
+    
+    Write-Host "[INFO] Restarting VM: $Name" -ForegroundColor Yellow
+    Restart-AzVM -Name $Name -ResourceGroupName $ResourceGroupName -NoWait
+    Write-Host "[SUCCESS] Restart command sent" -ForegroundColor Green
+}
+
+#==============================================================================
+# TAGGING OPERATIONS
+#==============================================================================
+
+# FIND RESOURCES BY TAG
+function findtag {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$TagName,
+        [string]$TagValue = ""
+    )
+    
+    if ($TagValue) {
+        Write-Host "[SEARCHING] Resources with tag $TagName=$TagValue" -ForegroundColor Yellow
+        $resources = Get-AzResource -TagName $TagName -TagValue $TagValue
+    } else {
+        Write-Host "[SEARCHING] Resources with tag: $TagName" -ForegroundColor Yellow
+        $resources = Get-AzResource -TagName $TagName
+    }
+    
+    $resources | Select-Object Name, ResourceGroupName, ResourceType, @{N='TagCount';E={$_.Tags.Count}} | Format-Table -AutoSize
+    Write-Host "[FOUND] $($resources.Count) resources" -ForegroundColor Cyan
+}
+
+# LIST ALL TAGS IN USE
+function tags {
+    Write-Host "[INFO] Fetching all tags..." -ForegroundColor Yellow
+    $allTags = Get-AzTag
+    $allTags.Name | Sort-Object | ForEach-Object {
+        Write-Host "  $_" -ForegroundColor White
+    }
+    Write-Host "`n[TOTAL] $($allTags.Count) tags in use" -ForegroundColor Cyan
+}
+
+#==============================================================================
+# COST & MONITORING
+#==============================================================================
+
+# SHOW RESOURCE GROUP COSTS (requires cost management)
+function rgcost {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$ResourceGroupName
+    )
+    
+    Write-Host "[INFO] Note: This requires Az.CostManagement module" -ForegroundColor Yellow
+    Write-Host "[INFO] Install with: Install-Module -Name Az.CostManagement" -ForegroundColor Gray
+}
+
+#==============================================================================
+# BULK OPERATIONS
+#==============================================================================
+
+# EXPORT ALL RESOURCE GROUPS TO CSV
+function Export-RGs {
+    param(
+        [string]$Path = "$env:USERPROFILE\Documents\ResourceGroups_$(Get-Date -Format 'yyyyMMdd_HHmmss').csv"
+    )
+    
+    $rgs = Get-AzResourceGroup
+    $rgs | Select-Object ResourceGroupName, Location, ProvisioningState, 
+        @{N='TagCount';E={$_.Tags.Count}}, ResourceId | 
+        Export-Csv -Path $Path -NoTypeInformation
+    
+    Write-Host "[SUCCESS] Exported $($rgs.Count) resource groups to:" -ForegroundColor Green
+    Write-Host "  $Path" -ForegroundColor White
+}
+
+# EXPORT ALL RESOURCES TO CSV
+function Export-Resources {
+    param(
+        [string]$Path = "$env:USERPROFILE\Documents\Resources_$(Get-Date -Format 'yyyyMMdd_HHmmss').csv"
+    )
+    
+    Write-Host "[INFO] Fetching all resources (this may take a moment)..." -ForegroundColor Yellow
+    $resources = Get-AzResource
+    $resources | Select-Object Name, ResourceGroupName, ResourceType, Location, 
+        @{N='TagCount';E={$_.Tags.Count}}, ResourceId | 
+        Export-Csv -Path $Path -NoTypeInformation
+    
+    Write-Host "[SUCCESS] Exported $($resources.Count) resources to:" -ForegroundColor Green
+    Write-Host "  $Path" -ForegroundColor White
+}
+
+#==============================================================================
+# UTILITIES
+#==============================================================================
+
+# CLEAR SUBSCRIPTION CACHE
+function Clear-SubCache {
+    $global:AzSubCache = $null
+    $global:AzSubCacheTime = $null
+    $global:AzSubCacheEnv = $null
+    Write-Host "[SUCCESS] Subscription cache cleared" -ForegroundColor Green
+}
+
+# AZURE CONTEXT INFO (detailed)
+function azinfo {
+    $ctx = Get-AzContext
+    if ($ctx) {
+        $cloudName = if ($ctx.Environment.Name -eq 'AzureUSGovernment') { 'Azure Government' } else { 'Azure Commercial' }
+        
+        Write-Host "`n=== Azure Context ===" -ForegroundColor Cyan
+        Write-Host "Cloud:        $cloudName" -ForegroundColor White
+        Write-Host "Subscription: $($ctx.Subscription.Name)" -ForegroundColor White
+        Write-Host "Tenant:       $($ctx.Tenant.Id)" -ForegroundColor White
+        Write-Host "Account:      $($ctx.Account.Id)" -ForegroundColor White
+        Write-Host "===================`n" -ForegroundColor Cyan
+    } else {
+        Write-Host "[ERROR] Not connected to Azure. Run Connect-AzAccount or azcloud" -ForegroundColor Red
+    }
+}
+
+# QUICK CHEAT SHEET
+function azhelp {
+    Write-Host "`n" -NoNewline
+    Write-Host "═══════════════════════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host "          AZURE POWERSHELL QUICK REFERENCE                         " -ForegroundColor Cyan
+    Write-Host "═══════════════════════════════════════════════════════════════════`n" -ForegroundColor Cyan
+    
+    Write-Host "[CLOUD MANAGEMENT]" -ForegroundColor Green
+    Write-Host "  azcloud              - Show current cloud"
+    Write-Host "  azcloud gov          - Switch to Azure Government"
+    Write-Host "  azcloud comm         - Switch to Azure Commercial"
+    Write-Host ""
+    
+    Write-Host "[SUBSCRIPTION COMMANDS]" -ForegroundColor Green
+    Write-Host "  ss <name>            - Switch subscription (fuzzy match)"
+    Write-Host "  ssn <#>              - Switch by number from subs list"
+    Write-Host "  sub                  - Show current subscription"
+    Write-Host "  subs [filter]        - List all subscriptions (numbered)"
+    Write-Host "  recent               - Show recently used subscriptions"
+    Write-Host ""
+    
+    Write-Host "[RESOURCE GROUP COMMANDS]" -ForegroundColor Green
+    Write-Host "  rg [filter]          - List resource groups"
+    Write-Host "  rgr <name>           - List resources in resource group"
+    Write-Host "  rgcount <name>       - Count resources by type in RG"
+    Write-Host ""
+    
+    Write-Host "[SEARCH & DISCOVERY]" -ForegroundColor Green
+    Write-Host "  findres <name>       - Search resources by name"
+    Write-Host "  findtype <type>      - Find resources by type"
+    Write-Host "  restypes             - List all resource types in subscription"
+    Write-Host "  findtag <tag> [val]  - Find resources by tag"
+    Write-Host "  tags                 - List all tags in use"
+    Write-Host ""
+    
+    Write-Host "[VM OPERATIONS]" -ForegroundColor Green
+    Write-Host "  vms [rg]             - List VMs with power state"
+    Write-Host "  vmstart <name> <rg>  - Start a VM"
+    Write-Host "  vmstop <name> <rg>   - Stop a VM"
+    Write-Host "  vmrestart <name> <rg>- Restart a VM"
+    Write-Host ""
+    
+    Write-Host "[BULK OPERATIONS]" -ForegroundColor Green
+    Write-Host "  Export-RGs           - Export all RGs to CSV"
+    Write-Host "  Export-Resources     - Export all resources to CSV"
+    Write-Host ""
+    
+    Write-Host "[INFORMATION]" -ForegroundColor Green
+    Write-Host "  azinfo               - Show detailed Azure context"
+    Write-Host "  Clear-SubCache       - Clear subscription cache"
+    Write-Host "  azhelp               - Show this cheat sheet"
+    Write-Host ""
+    
+    Write-Host "[OTHER FUNCTIONS]" -ForegroundColor Green
+    Write-Host "  Connect-vmw132       - SSH to non-compliant Linux jumpbox"
+    Write-Host "  Connect-vmw2233      - SSH to compliant Linux jumpbox"
+    Write-Host "  Get-RandomPassword   - Generate random password (auto-copy)"
+    Write-Host "  myip [4|6|both]      - Get public IP address (auto-copy)"
+    Write-Host "  localip              - Get local IP addresses (auto-copy)"
+    Write-Host "  New-CSR              - Create Certificate Signing Request"
+    Write-Host ""
+    
+    Write-Host "[PRO TIPS]" -ForegroundColor Yellow
+    Write-Host "  • Cache auto-refreshes every 30 minutes"
+    Write-Host "  • Use 'subs' then 'ssn <#>' for fastest switching"
+    Write-Host "  • All commands work in both Gov and Commercial clouds"
+    Write-Host "  • Use partial names for fuzzy matching (ss prod, rg web)"
+    Write-Host "  • Press TAB to auto-complete subscription/RG/VM names"
+    Write-Host "`n"
+}
+
+#==============================================================================
+# ORIGINAL FUNCTIONS (Preserved)
+#==============================================================================
+
+#Atmo SSH to jumpboxes
+$Linux = "orugel"
+$Atmo2 = "omar.rugel"
+
+function Connect-vmw132 {
+    $vmw132 = "10.156.127.4"
+    ssh -oHostKeyAlgorithms=+ssh-rsa $Linux@$vmw132
+}
+
+function Connect-vmw2233 {
+    $vmw2233 = '10.170.176.15'
+    SSH -m hmac-sha2-256 $Atmo2@vmw2233.atmosera.com
+}
+
+# GET PUBLIC IP ADDRESS
+function myip {
+    param(
+        [Parameter(Mandatory=$false)]
+        [ValidateSet('4', '6', 'both')]
+        [string]$Version = 'both'
+    )
+    
+    try {
+        if ($Version -eq '4' -or $Version -eq 'both') {
+            Write-Host "[INFO] Fetching IPv4 address..." -ForegroundColor Yellow
+            $ipv4 = (Invoke-RestMethod -Uri 'https://api.ipify.org?format=json' -TimeoutSec 5).ip
+            
+            if ($ipv4) {
+                Write-Host "[IPv4] $ipv4" -ForegroundColor Green
+                
+                if ($Version -eq '4') {
+                    $ipv4 | Set-Clipboard
+                    Write-Host "[SUCCESS] IPv4 copied to clipboard!" -ForegroundColor Green
+                    return $ipv4
+                }
+            }
+        }
+        
+        if ($Version -eq '6' -or $Version -eq 'both') {
+            Write-Host "[INFO] Fetching IPv6 address..." -ForegroundColor Yellow
+            try {
+                $ipv6 = (Invoke-RestMethod -Uri 'https://api64.ipify.org?format=json' -TimeoutSec 5).ip
+                
+                if ($ipv6 -and $ipv6 -match ':') {
+                    Write-Host "[IPv6] $ipv6" -ForegroundColor Green
+                    
+                    if ($Version -eq '6') {
+                        $ipv6 | Set-Clipboard
+                        Write-Host "[SUCCESS] IPv6 copied to clipboard!" -ForegroundColor Green
+                        return $ipv6
+                    }
+                } else {
+                    Write-Host "[INFO] No IPv6 address available" -ForegroundColor Yellow
+                }
+            }
+            catch {
+                Write-Host "[INFO] IPv6 not available or timeout" -ForegroundColor Yellow
+            }
+        }
+        
+        if ($Version -eq 'both' -and $ipv4) {
+            $ipv4 | Set-Clipboard
+            Write-Host "[SUCCESS] IPv4 copied to clipboard!" -ForegroundColor Green
+            return $ipv4
+        }
+    }
+    catch {
+        Write-Error "Failed to retrieve IP address: $($_.Exception.Message)"
+    }
+}
+
+# GET LOCAL IP ADDRESSES
+function localip {
+    Write-Host "[INFO] Local IP Addresses:" -ForegroundColor Cyan
+    
+    $adapters = Get-NetIPAddress | 
+        Where-Object { $_.AddressFamily -in @('IPv4', 'IPv6') -and $_.InterfaceAlias -notlike '*Loopback*' } |
+        Select-Object InterfaceAlias, IPAddress, AddressFamily |
+        Sort-Object AddressFamily, InterfaceAlias
+    
+    $adapters | Format-Table -AutoSize
+    
+    # Copy primary IPv4 to clipboard
+    $primaryIPv4 = ($adapters | Where-Object { $_.AddressFamily -eq 'IPv4' } | Select-Object -First 1).IPAddress
+    if ($primaryIPv4) {
+        $primaryIPv4 | Set-Clipboard
+        Write-Host "[SUCCESS] Primary IPv4 ($primaryIPv4) copied to clipboard!" -ForegroundColor Green
+    }
+}
+
+function Get-RandomPassword {
+    param (
+        [Parameter(Mandatory=$false)]
+        [int]$length = 16,
+        [int]$amountOfNonAlphanumeric = 4
+    )
+    
+    # Character sets
+    $uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    $lowercase = 'abcdefghijklmnopqrstuvwxyz'
+    $numbers = '0123456789'
+    $special = '!@#$%^&*()_+-=[]{}|;:,.<>?'
+    
+    # Ensure minimum length
+    if ($length -lt 8) {
+        $length = 8
+    }
+    
+    # Calculate how many of each type
+    $numSpecial = [Math]::Min($amountOfNonAlphanumeric, $length - 3)
+    $numNumbers = [Math]::Max(1, [Math]::Floor(($length - $numSpecial) * 0.25))
+    $numUpper = [Math]::Max(1, [Math]::Floor(($length - $numSpecial - $numNumbers) * 0.5))
+    $numLower = $length - $numSpecial - $numNumbers - $numUpper
+    
+    # Generate password parts
+    $password = @()
+    
+    # Add required characters
+    for ($i = 0; $i -lt $numUpper; $i++) {
+        $password += $uppercase[(Get-Random -Maximum $uppercase.Length)]
+    }
+    for ($i = 0; $i -lt $numLower; $i++) {
+        $password += $lowercase[(Get-Random -Maximum $lowercase.Length)]
+    }
+    for ($i = 0; $i -lt $numNumbers; $i++) {
+        $password += $numbers[(Get-Random -Maximum $numbers.Length)]
+    }
+    for ($i = 0; $i -lt $numSpecial; $i++) {
+        $password += $special[(Get-Random -Maximum $special.Length)]
+    }
+    
+    # Shuffle the password
+    $password = $password | Sort-Object {Get-Random}
+    $generatedPassword = -join $password
+    
+    # Copy to clipboard
+    $generatedPassword | Set-Clipboard
+    
+    Write-Host "[SUCCESS] Password generated and copied to clipboard!" -ForegroundColor Green
+    Write-Host "[PASSWORD] $generatedPassword" -ForegroundColor Yellow
+    
+    return $generatedPassword
+}
+
+function New-CSR {
+    param (
+        [Parameter(Mandatory, HelpMessage="Provide the Domain Name of the root domain being renewed")]
+        [string]$DomainName,
+        [Parameter(HelpMessage="Switch definition of if wildcard or not wildcard")]
+        [switch]$Wildcard,
+        [Parameter(Mandatory, HelpMessage="What year the renewed certificate will be valid until")]
+        [int]$ExpirationYear
+    )
+    
+    if (-NOT([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+        Write-Host "Administrator priviliges are required. Please restart this script with elevated rights." -ForegroundColor Red
+        Pause
+        Throw "Administrator priviliges are required. Please restart this script with elevated rights."
+    }
+    
+    $UID = [guid]::NewGuid()
+    $files = @{}
+    $files['settings'] = "$($env:TEMP)\$($UID)-settings.inf";
+    $files['csr'] = "$($env:TEMP)\$($UID)-csr.req";
+    $files['key'] = "$($env:TEMP)\$($UID)-key.key"
+    
+    $request = @{}
+    $request['SAN'] = @{}
+    
+    Write-Host "Provide the Subject details required for the Certificate Signing Request" -ForegroundColor Yellow
+    if($WildCard) {
+        $request['CN'] = '*.'+$DomainName
+    } else {
+        $request['CN'] = $DomainName
+    }
+    $request['O'] = Read-Host "Organisation (O) E.G. Atmosera Inc"
+    $request['OU'] = Read-Host "Organisational Unit (OU) E.G. IT"
+    $request['L'] = Read-Host "Locality / City (L) E.G. Beaverton"
+    $request['S'] = Read-Host "State (S) E.G. Oregon"
+    $request['C'] = Read-Host "Country Code (C); E.G. US"
+    
+    $i = 0
+    Do {
+        $i++
+        $request['SAN'][$i] = read-host "Subject Alternative Name $i (e.g. alt.company.com / leave empty for none)"
+        if ($request['SAN'][$i] -eq "") {}
+    } until ($request['SAN'][$i] -eq "")
+    
+    $request['SAN'].Remove($request['SAN'].Count)
+    
+    $settingsInf = "
+    [Version] 
+    Signature=`"`$Windows NT`$ 
+    [NewRequest] 
+    KeyLength =  2048
+    Exportable = TRUE 
+    MachineKeySet = TRUE 
+    SMIME = FALSE
+    RequestType =  PKCS10 
+    ProviderName = `"Microsoft RSA SChannel Cryptographic Provider`" 
+    ProviderType =  12
+    HashAlgorithm = sha256
+    Subject = `"CN={{CN}},OU={{OU}},O={{O}},L={{L}},S={{S}},C={{C}}`"
+    [Extensions]
+    {{SAN}}
+    "
+    
+    $request['SAN_string'] = & {
+        if ($request['SAN'].Count -gt 0) {
+            $san = "2.5.29.17 = `"{text}`"`n"
+            Foreach ($sanItem In $request['SAN'].Values) {
+                $san += "_continue_ = `"dns="+$sanItem+"&`"`n"
+            }
+            return $san
+        }
+    }
+    
+    $settingsInf = $settingsInf.Replace("{{CN}}",$request['CN']).Replace("{{O}}",$request['O']).Replace("{{OU}}",$request['OU']).Replace("{{L}}",$request['L']).Replace("{{S}}",$request['S']).Replace("{{C}}",$request['C']).Replace("{{SAN}}",$request['SAN_string'])
+    
+    $settingsInf > $files['settings']
+    Clear-Host
+    
+    Write-Host "Certificate information
+    Common name: $($request['CN'])
+    Organisation: $($request['O'])
+    Organisational unit: $($request['OU'])
+    City: $($request['L'])
+    State: $($request['S'])
+    Country: $($request['C'])
+    
+    Subject alternative name(s): $($request['SAN'].Values -join ", ")
+    
+    Signature algorithm: SHA256
+    Key algorithm: RSA
+    Key size: 2048
+    " -ForegroundColor Yellow
+    
+    certreq -new $files['settings'] $files['csr'] > $null
+    
+    $CSR = Get-Content $files['csr']
+    Write-Output $CSR
+    Write-Host "`n"
+    
+    Write-Host "Copy CSR to clipboard? (y|n): " -ForegroundColor Yellow -NoNewline
+    if ((Read-Host) -ieq "y") {
+        $csr | clip
+        Write-Host "Check your ctrl+v`n"
+    }
+    
+    Write-Host "Collecting Private Key information"
+    $cert = Get-ChildItem Cert:\ -Recurse | ? {$_.Issuer -like "$($request['CN'])*"}
+    
+    $RSACng = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($cert)
+    $KeyBytes = $RSACng.Key.Export([System.Security.Cryptography.CngKeyBlobFormat]::Pkcs8PrivateBlob)
+    $KeyBase64 = [System.Convert]::ToBase64String($KeyBytes, [System.Base64FormattingOptions]::InsertLineBreaks)
+    
+    $KeyPem = @"
+-----BEGIN PRIVATE KEY-----
+$KeyBase64
+-----END PRIVATE KEY-----
+"@
+    
+    New-Item -Path $files['key'] -Value $KeyPem -ItemType File
+    Get-Content $files['key']
+    
+    [string]$Zip_Path = ($ENV:USERPROFILE+"\Documents\"+$DomainName+"_"+$ExpirationYear+".zip")
+    Compress-Archive -Path $files.values -Destination $Zip_Path -CompressionLevel Optimal
+    
+    $files.Values | ForEach-Object {
+        Remove-Item $_ -ErrorAction SilentlyContinue
+    }
+}
+
+# Legacy function (kept for compatibility)
+function Set-AzSubscriptionByName {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory=$true, Position=0)]
+        [string]$SubscriptionName
+    )
+    ss $SubscriptionName
+}
+
+Set-Alias -Name Switch-AzSub -Value Set-AzSubscriptionByName
+
+#==============================================================================
+# STARTUP MESSAGE
+#==============================================================================
+Write-Host "`n[LOADED] Azure PowerShell Profile" -ForegroundColor Green
+Write-Host "[INFO] Type 'azhelp' for command reference`n" -ForegroundColor Cyan
+
+#==============================================================================
+# TERMINAL RICING (ASCII & STATS)
+#==============================================================================
+
+function Show-SystemInfo {
+    $os = Get-CimInstance Win32_OperatingSystem
+    $mem = Get-CimInstance Win32_PhysicalMemory | Measure-Object -Property Capacity -Sum
+    $cpu = Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average
+    $disk = Get-PSDrive C
+
+    $uptime = (Get-Date) - $os.LastBootUpTime
+
+    Write-Host "`n"
+    Write-Host " ---------------------------------------------------" -ForegroundColor Cyan
+    Write-Host "   OS:       $($os.Caption) ($($os.OSArchitecture))" -ForegroundColor White
+    Write-Host "   Kernel:   $($os.Version)" -ForegroundColor White
+    Write-Host "   Uptime:   $($uptime.TotalHours.ToString('N1')) hours" -ForegroundColor White
+    Write-Host "   CPU:      $($cpu.Average)% Load" -ForegroundColor White
+    Write-Host "   Memory:   $([math]::Round($mem.Sum / 1GB, 2)) GB Total" -ForegroundColor White
+    Write-Host "   Disk (C): $([math]::Round($disk.Free / 1GB, 2)) GB Free / $([math]::Round($disk.Used / 1GB, 2)) GB Used" -ForegroundColor White
+    Write-Host "   Theme:    $([System.IO.Path]::GetFileNameWithoutExtension($env:POSH_THEME_PATH))" -ForegroundColor Magenta
+    Write-Host " ---------------------------------------------------" -ForegroundColor Cyan
+    Write-Host "`n"
+}
+
+function Show-Rice {
+    Show-SystemInfo
+}
+
+# Run startup info
+Show-Rice

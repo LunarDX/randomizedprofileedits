@@ -2,17 +2,13 @@
 [System.Runtime.ProfileOptimization]::SetProfileRoot("$env:USERPROFILE\.cache\pwsh")
 [System.Runtime.ProfileOptimization]::StartProfile("startup.prof")
 
-#============================================================
-# OPENCODE PERFORMANCE OPTIMIZATION
-#============================================================
-# Reduce startup overhead by disabling telemetry/spinners
-# and prewarming configuration in background once per session.
-$env:OPENCODE_NO_TELEMETRY = 1
-$env:OPENCODE_NO_PROGRESS = 1
-$env:OPENCODE_NO_UPDATE_CHECK = 1
-
-# Prewarm OpenCode cache silently for fast first-time launch.
-Start-Job { & "$env:USERPROFILE\.opencode\bin\opencode.exe" --prewarm 2>$null } | Out-Null
+#==============================================================================
+# CURSOR CLI FIX — disables oh-my-posh in Cursor agent sessions
+# Prevents oh-my-posh from interfering with Cursor's prompt detection
+#==============================================================================
+if ($env:CURSOR_TRACE_ID) {
+    function prompt { "PS $PWD> " }
+}
 
 #==============================================================================
 # LUNARVIM & NEOVIM INTEGRATION
@@ -52,105 +48,170 @@ function Set-AIKeys {
 # Startup uses cached init script for speed.
 # Switching uses Invoke-Expression for live reload in current session.
 #==============================================================================
-$themePath = "$env:USERPROFILE\Documents\PowerShell\Themes"
-$savedThemeFile = "$env:USERPROFILE\.cache\omp\saved_theme.txt"
-$ompCacheDir = "$env:USERPROFILE\.cache\omp"
-New-Item -ItemType Directory -Path $ompCacheDir -Force | Out-Null
-New-Item -ItemType Directory -Path "$env:USERPROFILE\.cache\pwsh" -Force | Out-Null
+if (-not $env:CURSOR_TRACE_ID) {
+    # PATH — must be first so all subsequent calls to oh-my-posh resolve
+    $env:Path += ";$env:LOCALAPPDATA\Programs\oh-my-posh\bin"
 
-function Get-OmpCache {
-    param([string]$ThemePath, [string]$CacheFile)
-    $initOutput = oh-my-posh init pwsh --config $ThemePath
-    $tempFile = $initOutput | Select-String "& '(.+)'" | ForEach-Object { $_.Matches.Groups[1].Value }
-    Get-Content $tempFile | Set-Content $CacheFile
-}
-
-function Get-ThemeCacheFile {
-    param([string]$ThemeFullPath)
-    $baseName = [System.IO.Path]::GetFileNameWithoutExtension($ThemeFullPath)
-    $baseName = $baseName -replace '\.omp$', ''
-    return "$ompCacheDir\$baseName.ps1"
-}
-
-function Apply-Theme {
-    param([string]$ThemeFullPath)
-    oh-my-posh init pwsh --config $ThemeFullPath | Invoke-Expression
-}
-
-function Set-RandomTheme {
+    $themePath = "$env:USERPROFILE\Documents\PowerShell\Themes"
     $savedThemeFile = "$env:USERPROFILE\.cache\omp\saved_theme.txt"
     $ompCacheDir = "$env:USERPROFILE\.cache\omp"
-    $themePath = "$env:USERPROFILE\Documents\PowerShell\Themes"
+    New-Item -ItemType Directory -Path $ompCacheDir -Force | Out-Null
+    New-Item -ItemType Directory -Path "$env:USERPROFILE\.cache\pwsh" -Force | Out-Null
 
-    $themes = Get-ChildItem -Path $themePath -Filter "*.omp.*" -File |
-        Where-Object { $_.Extension -in @('.json', '.yaml', '.yml') }
-
-    $currentTheme = if (Test-Path $savedThemeFile) { (Get-Content $savedThemeFile -Raw).Trim() } else { "" }
-    $filtered = $themes | Where-Object { $_.FullName -ne $currentTheme }
-    if ($filtered.Count -eq 0) { $filtered = $themes }
-
-    $picked = $filtered | Get-Random -SetSeed ([System.Environment]::TickCount)
-    $picked.FullName | Set-Content $savedThemeFile
-    $env:POSH_THEME_PATH = $picked.FullName
-
-    $cacheFile = Get-ThemeCacheFile -ThemeFullPath $picked.FullName
-    if (!(Test-Path $cacheFile) -or (Get-Item $cacheFile).Length -lt 1000) {
-        Get-OmpCache -ThemePath $picked.FullName -CacheFile $cacheFile
+    function Get-OmpCache {
+        param([string]$ThemePath, [string]$CacheFile)
+        $initOutput = oh-my-posh init pwsh --config $ThemePath
+        $tempFile = $initOutput | Select-String "& '(.+)'" | ForEach-Object { $_.Matches.Groups[1].Value }
+        Get-Content $tempFile | Set-Content $CacheFile
     }
 
-    Apply-Theme -ThemeFullPath $picked.FullName
-    Write-Host "[THEME] $($picked.BaseName -replace '\.omp$','')" -ForegroundColor Cyan
-}
-Set-Alias -Name srt -Value Set-RandomTheme
-
-function Set-Theme {
-    $savedThemeFile = "$env:USERPROFILE\.cache\omp\saved_theme.txt"
-    $ompCacheDir = "$env:USERPROFILE\.cache\omp"
-    $themePath = "$env:USERPROFILE\Documents\PowerShell\Themes"
-
-    $themes = Get-ChildItem -Path $themePath -Filter "*.omp.*" -File |
-        Where-Object { $_.Extension -in @('.json', '.yaml', '.yml') }
-
-    $picked = $themes | Select-Object -ExpandProperty BaseName |
-        ForEach-Object { $_ -replace '\.omp$', '' } |
-        fzf --prompt "Select theme: " --height 40% --reverse
-
-    if (-not $picked) { return }
-
-    $theme = $themes | Where-Object { ($_.BaseName -replace '\.omp$', '') -eq $picked } | Select-Object -First 1
-    if (-not $theme) { Write-Host "Theme not found: $picked" -ForegroundColor Red; return }
-
-    $theme.FullName | Set-Content $savedThemeFile
-    $env:POSH_THEME_PATH = $theme.FullName
-
-    $cacheFile = Get-ThemeCacheFile -ThemeFullPath $theme.FullName
-    if (!(Test-Path $cacheFile) -or (Get-Item $cacheFile).Length -lt 1000) {
-        Get-OmpCache -ThemePath $theme.FullName -CacheFile $cacheFile
+    function Get-ThemeCacheFile {
+        param([string]$ThemeFullPath)
+        $baseName = [System.IO.Path]::GetFileNameWithoutExtension($ThemeFullPath)
+        $baseName = $baseName -replace '\.omp$', ''
+        return "$ompCacheDir\$baseName.ps1"
     }
 
-    Apply-Theme -ThemeFullPath $theme.FullName
-    Write-Host "[THEME] $picked" -ForegroundColor Cyan
-}
-Set-Alias -Name st -Value Set-Theme
+    function Apply-Theme {
+        param([string]$ThemeFullPath)
+        oh-my-posh init pwsh --config $ThemeFullPath | Invoke-Expression
+    }
 
-# Load saved theme on startup using cache (fast)
-if (Test-Path $savedThemeFile) {
-    $savedTheme = (Get-Content $savedThemeFile -Raw).Trim()
-    if (Test-Path $savedTheme) {
-        $env:POSH_THEME_PATH = $savedTheme
-        $cacheFile = Get-ThemeCacheFile -ThemeFullPath $savedTheme
+    function Set-RandomTheme {
+        $savedThemeFile = "$env:USERPROFILE\.cache\omp\saved_theme.txt"
+        $ompCacheDir = "$env:USERPROFILE\.cache\omp"
+        $themePath = "$env:USERPROFILE\Documents\PowerShell\Themes"
+
+        $themes = Get-ChildItem -Path $themePath -Filter "*.omp.*" -File |
+            Where-Object { $_.Extension -in @('.json', '.yaml', '.yml') }
+
+        $currentTheme = if (Test-Path $savedThemeFile) { (Get-Content $savedThemeFile -Raw).Trim() } else { "" }
+        $filtered = $themes | Where-Object { $_.FullName -ne $currentTheme }
+        if ($filtered.Count -eq 0) { $filtered = $themes }
+
+        $picked = $filtered | Get-Random -SetSeed ([System.Environment]::TickCount)
+        $picked.FullName | Set-Content $savedThemeFile
+        $env:POSH_THEME_PATH = $picked.FullName
+
+        $cacheFile = Get-ThemeCacheFile -ThemeFullPath $picked.FullName
         if (!(Test-Path $cacheFile) -or (Get-Item $cacheFile).Length -lt 1000) {
-            Get-OmpCache -ThemePath $savedTheme -CacheFile $cacheFile
+            Get-OmpCache -ThemePath $picked.FullName -CacheFile $cacheFile
         }
-        . $cacheFile
+
+        Apply-Theme -ThemeFullPath $picked.FullName
+        Write-Host "[THEME] $($picked.BaseName -replace '\.omp$','')" -ForegroundColor Cyan
+    }
+    Set-Alias -Name srt -Value Set-RandomTheme
+
+    function Set-Theme {
+        $savedThemeFile = "$env:USERPROFILE\.cache\omp\saved_theme.txt"
+        $ompCacheDir = "$env:USERPROFILE\.cache\omp"
+        $themePath = "$env:USERPROFILE\Documents\PowerShell\Themes"
+
+        $themes = Get-ChildItem -Path $themePath -Filter "*.omp.*" -File |
+            Where-Object { $_.Extension -in @('.json', '.yaml', '.yml') }
+
+        $picked = $themes | Select-Object -ExpandProperty BaseName |
+            ForEach-Object { $_ -replace '\.omp$', '' } |
+            fzf --prompt "Select theme: " --height 40% --reverse
+
+        if (-not $picked) { return }
+
+        $theme = $themes | Where-Object { ($_.BaseName -replace '\.omp$', '') -eq $picked } | Select-Object -First 1
+        if (-not $theme) { Write-Host "Theme not found: $picked" -ForegroundColor Red; return }
+
+        $theme.FullName | Set-Content $savedThemeFile
+        $env:POSH_THEME_PATH = $theme.FullName
+
+        $cacheFile = Get-ThemeCacheFile -ThemeFullPath $theme.FullName
+        if (!(Test-Path $cacheFile) -or (Get-Item $cacheFile).Length -lt 1000) {
+            Get-OmpCache -ThemePath $theme.FullName -CacheFile $cacheFile
+        }
+
+        Apply-Theme -ThemeFullPath $theme.FullName
+        Write-Host "[THEME] $picked" -ForegroundColor Cyan
+    }
+    Set-Alias -Name st -Value Set-Theme
+
+    # Load saved theme on startup using cache (fast)
+    if (Test-Path $savedThemeFile) {
+        $savedTheme = (Get-Content $savedThemeFile -Raw).Trim()
+        if (Test-Path $savedTheme) {
+            $env:POSH_THEME_PATH = $savedTheme
+            $cacheFile = Get-ThemeCacheFile -ThemeFullPath $savedTheme
+            if (!(Test-Path $cacheFile) -or (Get-Item $cacheFile).Length -lt 1000) {
+                Get-OmpCache -ThemePath $savedTheme -CacheFile $cacheFile
+            }
+            . $cacheFile
+        } else {
+            Set-RandomTheme
+        }
     } else {
         Set-RandomTheme
     }
-} else {
-    Set-RandomTheme
 }
 
-$env:Path += ";$env:LOCALAPPDATA\Programs\oh-my-posh\bin"
+#==============================================================================
+# YAZI THEME SWITCHING
+# syt  = pick yazi flavor with fzf
+# sryt = apply a random yazi flavor
+#==============================================================================
+function Set-YaziTheme {
+    $flavorsDir = "$env:APPDATA\yazi\config\flavors"
+    $themeFile  = "$env:APPDATA\yazi\config\theme.toml"
+
+    if (-not (Test-Path $flavorsDir)) {
+        Write-Host "[ERR] No flavors directory found at $flavorsDir" -ForegroundColor Red
+        return
+    }
+
+    $flavors = Get-ChildItem $flavorsDir -Directory |
+        Where-Object { $_.Name -like "*.yazi" } |
+        ForEach-Object { $_.Name -replace '\.yazi$', '' }
+
+    if (-not $flavors) {
+        Write-Host "[ERR] No flavors installed. Run: ya pkg add yazi-rs/flavors:catppuccin-macchiato" -ForegroundColor Red
+        return
+    }
+
+    $picked = $flavors | fzf --prompt "Yazi flavor: " --height 40% --reverse
+    if (-not $picked) { return }
+
+    "[flavor]`ndark = `"$picked`"`nlight = `"$picked`"" | Set-Content $themeFile
+    Write-Host "[YAZI THEME] $picked" -ForegroundColor Cyan
+}
+Set-Alias -Name syt -Value Set-YaziTheme
+
+function Set-RandomYaziTheme {
+    $flavorsDir = "$env:APPDATA\yazi\config\flavors"
+    $themeFile  = "$env:APPDATA\yazi\config\theme.toml"
+
+    if (-not (Test-Path $flavorsDir)) {
+        Write-Host "[ERR] No flavors directory found at $flavorsDir" -ForegroundColor Red
+        return
+    }
+
+    $flavors = Get-ChildItem $flavorsDir -Directory |
+        Where-Object { $_.Name -like "*.yazi" } |
+        ForEach-Object { $_.Name -replace '\.yazi$', '' }
+
+    if (-not $flavors) {
+        Write-Host "[ERR] No flavors installed." -ForegroundColor Red
+        return
+    }
+
+    $savedThemeFile = "$env:USERPROFILE\.cache\yazi_theme.txt"
+    $current = if (Test-Path $savedThemeFile) { (Get-Content $savedThemeFile -Raw).Trim() } else { "" }
+    $filtered = $flavors | Where-Object { $_ -ne $current }
+    if (-not $filtered) { $filtered = $flavors }
+
+    $picked = $filtered | Get-Random -SetSeed ([System.Environment]::TickCount)
+    $picked | Set-Content $savedThemeFile
+
+    "[flavor]`ndark = `"$picked`"`nlight = `"$picked`"" | Set-Content $themeFile
+    Write-Host "[YAZI THEME] $picked" -ForegroundColor Cyan
+}
+Set-Alias -Name sryt -Value Set-RandomYaziTheme
 
 #==============================================================================
 # CORE UTILITIES & FZF
@@ -227,62 +288,116 @@ function gsw-env {
 
 #==============================================================================
 # PANE SPLITTING — wt.exe based splits with CWD and custom size
-# sr              = split right at 40% (default)
-# sr -Size 30     = split right at 30%
-# sd              = split down at 40% (default)
-# sd -Size 50     = split down at 50%
-# oc              = split right at 35% and launch OpenCode (default)
-# oc -Size 40     = split right at 40% and launch OpenCode
-# oc -Down        = split down instead of right
-# oc -Size 40 -Down = split down at 40% and launch OpenCode
+# sr                  = split right at 40% (default)
+# sr -Size 30         = split right at custom size
+# sd                  = split down at 40% (default)
+# sd -Size 50         = split down at custom size
+# oc                  = split right 35%, launch OpenCode
+# oc -Size 40         = split right at custom size, launch OpenCode
+# oc -Down            = split down, launch OpenCode
+# oc -Size 40 -Down   = split down at custom size, launch OpenCode
+# ca                  = split right 35%, launch Cursor agent
+# ca -Size 40         = split right at custom size, launch Cursor agent
+# ca -Down            = split down, launch Cursor agent
+# ca -Size 40 -Down   = split down at custom size, launch Cursor agent
 #==============================================================================
 function split-right {
     param([int]$Size = 40)
-    wt.exe split-pane --vertical --size ($Size / 100) --startingDirectory $PWD.Path
+    wt.exe --window 0 split-pane --vertical --size ($Size / 100) --startingDirectory $PWD.Path
 }
 
 function split-down {
     param([int]$Size = 40)
-    wt.exe split-pane --horizontal --size ($Size / 100) --startingDirectory $PWD.Path
+    wt.exe --window 0 split-pane --horizontal --size ($Size / 100) --startingDirectory $PWD.Path
 }
 
 function Open-OpenCode {
     param(
         [int]$Size = 35,
-        [switch]$Down,
-        [int]$TextSize = 12  # default text font size profile
+        [switch]$Down
     )
-    $exePath = "$env:USERPROFILE\\.opencode\\bin\\opencode.exe"
-
-    # Check for running OpenCode process
-    $openCodeProc = Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exePath }
-
-    if ($openCodeProc) {
-        Write-Host "🔁 Reusing existing OpenCode session (already open)." -ForegroundColor Yellow
-        try {
-            wt.exe move-focus right 2>$null
-        } catch {
-            Write-Host "Unable to focus OpenCode pane; already visible." -ForegroundColor DarkGray
-        }
-        return
-    }
-
-    # Removed informational banner for silent session launch
-
     if ($Down) {
-        wt.exe --window 0 split-pane --horizontal --profile "OpenCode Compact" --size ($Size / 100) --startingDirectory $PWD.Path `
-            -- pwsh -NoProfile -NoExit -Command "& '$exePath'"
+        wt.exe --window 0 split-pane --horizontal --size ($Size / 100) --startingDirectory $PWD.Path `
+            -- pwsh -NoExit -Command "& '$env:USERPROFILE\.opencode\bin\opencode.exe'"
     } else {
-        wt.exe --window 0 split-pane --vertical --profile "OpenCode Compact" --size ($Size / 100) --startingDirectory $PWD.Path `
-            -- pwsh -NoProfile -NoExit -Command "& '$exePath'"
+        wt.exe --window 0 split-pane --vertical --size ($Size / 100) --startingDirectory $PWD.Path `
+            -- pwsh -NoExit -Command "& '$env:USERPROFILE\.opencode\bin\opencode.exe'"
     }
 }
-Set-Alias -Name sr -Value split-right
-Set-Alias -Name sd -Value split-down
-Set-Alias -Name oc -Value Open-OpenCode
+
+function Open-Cursor {
+    param(
+        [int]$Size = 35,
+        [switch]$Down
+    )
+    if ($Down) {
+        wt.exe --window 0 split-pane --horizontal --size ($Size / 100) --startingDirectory $PWD.Path `
+            -- pwsh -NoExit -Command "cursor-agent"
+    } else {
+        wt.exe --window 0 split-pane --vertical --size ($Size / 100) --startingDirectory $PWD.Path `
+            -- pwsh -NoExit -Command "cursor-agent"
+    }
+}
+
+function Open-Gemini {
+    param(
+        [int]$Size = 35,
+        [switch]$Down
+    )
+    if ($Down) {
+        wt.exe --window 0 split-pane --horizontal --size ($Size / 100) --startingDirectory $PWD.Path `
+            -- pwsh -NoExit -Command "gemini"
+    } else {
+        wt.exe --window 0 split-pane --vertical --size ($Size / 100) --startingDirectory $PWD.Path `
+            -- pwsh -NoExit -Command "gemini"
+    }
+}
+Set-Alias -Name gem -Value Open-Gemini
+Set-Alias -Name sr  -Value split-right
+Set-Alias -Name sd  -Value split-down
+Set-Alias -Name oc  -Value Open-OpenCode
+Set-Alias -Name ca  -Value Open-Cursor
 
 Set-PSReadLineKeyHandler -Chord "Ctrl+Shift+RightArrow" -ScriptBlock { split-right }
 Set-PSReadLineKeyHandler -Chord "Ctrl+Shift+DownArrow"  -ScriptBlock { split-down }
+
+#==============================================================================
+# PATH MANAGEMENT — backup and restore User PATH to/from dotfiles
+# Backup-UserPath   = saves current User PATH to dotfiles and commits
+# Restore-UserPath  = restores User PATH from dotfiles
+#==============================================================================
+function Backup-UserPath {
+    $dotfiles = "$env:USERPROFILE\dotfiles"
+    $pathFile = "$dotfiles\user-path.txt"
+
+    if (-not (Test-Path $dotfiles)) {
+        Write-Host "[ERR] Dotfiles directory not found: $dotfiles" -ForegroundColor Red
+        return
+    }
+
+    [Environment]::GetEnvironmentVariable("PATH", "User") | Out-File $pathFile -NoNewline
+    Write-Host "[OK] User PATH saved to $pathFile" -ForegroundColor Green
+
+    Push-Location $dotfiles
+    git add user-path.txt
+    git commit -m "chore: update user PATH backup $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
+    git push
+    Pop-Location
+}
+
+function Restore-UserPath {
+    $pathFile = "$env:USERPROFILE\dotfiles\user-path.txt"
+
+    if (-not (Test-Path $pathFile)) {
+        Write-Host "[ERR] No backup found at $pathFile" -ForegroundColor Red
+        return
+    }
+
+    $saved = (Get-Content $pathFile -Raw).Trim()
+    [Environment]::SetEnvironmentVariable("PATH", $saved, "User")
+    Write-Host "[OK] User PATH restored from dotfiles" -ForegroundColor Green
+    Write-Host "[TIP] Open a fresh PowerShell window to apply changes" -ForegroundColor Gray
+}
 
 #==============================================================================
 # PROFILE HELP — type 'phelp' to see all custom commands
@@ -300,6 +415,13 @@ function Show-ProfileHelp {
     Write-Host "   oc -Size 40 -Down   Split down at custom size" -ForegroundColor White
 
     Write-Host ""
+    Write-Host "  CURSOR" -ForegroundColor Yellow
+    Write-Host "   ca                  Split right 35% and launch Cursor agent" -ForegroundColor White
+    Write-Host "   ca -Size 40         Split right at custom size" -ForegroundColor White
+    Write-Host "   ca -Down            Split down instead of right" -ForegroundColor White
+    Write-Host "   ca -Size 40 -Down   Split down at custom size" -ForegroundColor White
+
+    Write-Host ""
     Write-Host "  PANE SPLITTING" -ForegroundColor Yellow
     Write-Host "   sr                  Split right at 40%" -ForegroundColor White
     Write-Host "   sr -Size 30         Split right at custom size" -ForegroundColor White
@@ -307,9 +429,14 @@ function Show-ProfileHelp {
     Write-Host "   sd -Size 50         Split down at custom size" -ForegroundColor White
 
     Write-Host ""
-    Write-Host "  THEMES" -ForegroundColor Yellow
+    Write-Host "  OH-MY-POSH THEMES" -ForegroundColor Yellow
     Write-Host "   st                  Pick a theme with fzf" -ForegroundColor White
     Write-Host "   srt                 Pick a random theme" -ForegroundColor White
+
+    Write-Host ""
+    Write-Host "  YAZI THEMES" -ForegroundColor Yellow
+    Write-Host "   syt                 Pick a Yazi flavor with fzf" -ForegroundColor White
+    Write-Host "   sryt                Apply a random Yazi flavor" -ForegroundColor White
 
     Write-Host ""
     Write-Host "  GIT" -ForegroundColor Yellow
@@ -322,6 +449,8 @@ function Show-ProfileHelp {
     Write-Host "   diskutil            Run disk utilization script" -ForegroundColor White
     Write-Host "   sysinfo             Show system info (FastFetch)" -ForegroundColor White
     Write-Host "   Set-AIKeys          Set Anthropic/Gemini API keys for session" -ForegroundColor White
+    Write-Host "   Backup-UserPath     Save User PATH to dotfiles and commit" -ForegroundColor White
+    Write-Host "   Restore-UserPath    Restore User PATH from dotfiles" -ForegroundColor White
 
     Write-Host ""
     Write-Host "  KEYBINDS" -ForegroundColor Yellow
@@ -331,7 +460,7 @@ function Show-ProfileHelp {
     Write-Host "   Tab                 Menu complete" -ForegroundColor White
     Write-Host ""
 }
-Set-Alias -Name ochelp -Value Show-ProfileHelp
+Set-Alias -Name phelp -Value Show-ProfileHelp
 
 #==============================================================================
 # CWD CACHING — remembers directory across pane splits
@@ -349,139 +478,26 @@ Register-EngineEvent -SourceIdentifier PowerShell.OnIdle -Action {
 # Restore last CWD - MUST BE LAST
 if (Test-Path $cwdCache) {
     $lastDir = (Get-Content $cwdCache -Raw).Trim()
-if ($lastDir -and (Test-Path $lastDir)) {
-    Set-Location $lastDir
-}
-}
-
-#==============================================================================
-# AZURE CONTEXT SWITCHING with FZF + Tab Completion
-#==============================================================================
-function Set-FzfAzContext {
-    [CmdletBinding()]
-    param(
-        [ArgumentCompleter({
-            param($commandName, $parameterName, $wordToComplete)
-            Get-AzSubscription |
-                Where-Object { $_.Name -like "*$wordToComplete*" } |
-                ForEach-Object {
-                    [System.Management.Automation.CompletionResult]::new(
-                        $_.Id, $_.Name, 'ParameterValue', $_.Name
-                    )
-                }
-        })]
-        [string]$SubscriptionId
-    )
-
-    if (-not $SubscriptionId) {
-        $SubscriptionId = Get-AzSubscription |
-            ForEach-Object { "$($_.Name) [$($_.Id)]" } |
-            fzf --prompt="Select Azure Subscription> " |
-            ForEach-Object { ($_ -split '\[|\]')[1] }
-    }
-
-    if (-not $SubscriptionId) {
-        Write-Host "No subscription selected."
-        return
-    }
-
-Set-AzContext -SubscriptionId $SubscriptionId | Out-Null
-Write-Host "✔ Switched context to SubscriptionId=$SubscriptionId" -ForegroundColor Green
-}
-
-Set-Alias scx Set-FzfAzContext
-
-#==============================================================================
-# REFRESH & CACHE AZURE SUBSCRIPTIONS
-#==============================================================================
-function Refresh-AzSubs {
-    Write-Host "Refreshing Azure subscriptions..." -ForegroundColor Yellow
-    try {
-        $global:AzSubsCache = Get-AzSubscription -ErrorAction Stop
-        Write-Host "✔ Cached $($global:AzSubsCache.Count) subscriptions." -ForegroundColor Green
-    } catch {
-        Write-Host "❌ Failed to get subscriptions: $($_.Exception.Message)" -ForegroundColor Red
+    if ($lastDir -and (Test-Path $lastDir)) {
+        Set-Location $lastDir
     }
 }
 
-# Modify Set-FzfAzContext to use cache if available
-Remove-Item Function:\Set-FzfAzContext -ErrorAction SilentlyContinue
-function Set-FzfAzContext {
-    [CmdletBinding()]
-    param(
-        [ArgumentCompleter({
-            param($commandName, $parameterName, $wordToComplete)
-            if ($global:AzSubsCache) {
-                $subs = $global:AzSubsCache
-            } else {
-                $subs = Get-AzSubscription
-            }
-            $subs |
-                Where-Object { $_.Name -like "*$wordToComplete*" } |
-                ForEach-Object {
-                    [System.Management.Automation.CompletionResult]::new($_.Id, $_.Name, 'ParameterValue', $_.Name)
-                }
-        })]
-        [string]$SubscriptionId
-    )
+$env:PATH += ";C:\Users\OmarRugel\AppData\Local\espanso"
 
-    if ($global:AzSubsCache) {
-        $subscriptions = $global:AzSubsCache
-    } else {
-        $subscriptions = Get-AzSubscription
+$env:PATH += ";C:\Users\OmarRugel\AppData\Local\Programs\Espanso"
+
+# File: $PROFILE
+Import-Module PSReadLine
+# Alt+T opens fzf and inserts the selected file path
+Set-PSReadLineKeyHandler -Chord 'Ctrl+t' -BriefDescription 'fzf file picker' -ScriptBlock {
+    $file = & fzf
+    if ($file) {
+        [Microsoft.PowerShell.PSConsoleReadLine]::Insert(" $file")
     }
-
-    if (-not $SubscriptionId) {
-        $SubscriptionId = $subscriptions |
-            ForEach-Object { "$($_.Name) [$($_.Id)]" } |
-            fzf --prompt "Select Azure Subscription> " |
-            ForEach-Object { ($_ -split '\[|\]')[1] }
-    }
-
-    if (-not $SubscriptionId) {
-        Write-Host "No subscription selected."
-        return
-    }
-
-    Set-AzContext -SubscriptionId $SubscriptionId | Out-Null
-    Write-Host "✔ Switched context to SubscriptionId=$SubscriptionId" -ForegroundColor Green
 }
-# Function to open Obsidian vault or specific file
-function obs {
-    param(
-        [string]$FilePath
-    )
-
-    $vaultName = "work"
-    $vaultPath = "C:\Users\OmarRugel\Documents\work"
-
-    if ($FilePath) {
-        try {
-            $resolvedPath = Resolve-Path $FilePath -ErrorAction Stop
-        } catch {
-            Write-Host "File not found: $FilePath"
-            return
-        }
-
-        $fullPath = $resolvedPath.Path
-        $relativePath = ""
-
-        # If file is inside vault, make it relative
-        if ($fullPath -like "$vaultPath*") {
-            $relativePath = $fullPath.Substring($vaultPath.Length + 1)
-        } else {
-            Write-Host "Warning: File is outside vault; opening base vault instead."
-            Start-Process "obsidian://open?vault=$vaultName"
-            return
-        }
-
-        # Convert backslashes to forward slashes and escape special characters
-        $encodedPath = $relativePath -replace '\\', '/'
-        $fileUri = [uri]::EscapeDataString($encodedPath)
-
-        $obsidianUri = "obsidian://open?vault=$vaultName&file=$fileUri"
-        Start-Process $obsidianUri
-    } else {
-        Start-Process "obsidian://open?vault=$vaultName"
-    }
+# Optional helper command: pick and open directly in nvim
+function vf {
+    $file = & fzf
+    if ($file) { nvim -- $file }
 }

@@ -1,0 +1,258 @@
+<Objs Version="1.1.0.1" xmlns="http://schemas.microsoft.com/powershell/2004/04">
+  <Obj RefId="0">
+    <TN RefId="0">
+      <T>Microsoft.PowerShell.Commands.PSRepositoryItemInfo</T>
+      <T>System.Management.Automation.PSCustomObject</T>
+      <T>System.Object</T>
+    </TN>
+    <MS>
+      <S N="Name">Az.DeviceRegistry</S>
+      <Version N="Version">1.0.0</Version>
+      <S N="Type">Module</S>
+      <S N="Description">Microsoft Azure PowerShell: DeviceRegistry cmdlets</S>
+      <S N="Author">Microsoft Corporation</S>
+      <S N="CompanyName">azure-sdk</S>
+      <S N="Copyright">Microsoft Corporation. All rights reserved.</S>
+      <DT N="PublishedDate">2025-11-04T01:50:18-08:00</DT>
+      <Obj N="InstalledDate" RefId="1">
+        <DT>2026-01-26T20:45:48.0274767-08:00</DT>
+        <MS>
+          <Obj N="DisplayHint" RefId="2">
+            <TN RefId="1">
+              <T>Deserialized.Microsoft.PowerShell.Commands.DisplayHintType</T>
+              <T>Deserialized.System.Enum</T>
+              <T>Deserialized.System.ValueType</T>
+              <T>Deserialized.System.Object</T>
+            </TN>
+            <ToString>DateTime</ToString>
+            <I32>2</I32>
+          </Obj>
+        </MS>
+      </Obj>
+      <Obj N="UpdatedDate" RefId="3">
+        <DT>2026-03-10T16:48:27.3102813-07:00</DT>
+        <MS>
+          <Obj N="DisplayHint" RefId="4">
+            <TN RefId="2">
+              <T>Microsoft.PowerShell.Commands.DisplayHintType</T>
+              <T>System.Enum</T>
+              <T>System.ValueType</T>
+              <T>System.Object</T>
+            </TN>
+            <ToString>DateTime</ToString>
+            <I32>2</I32>
+          </Obj>
+        </MS>
+      </Obj>
+      <URI N="LicenseUri">https://aka.ms/azps-license</URI>
+      <URI N="ProjectUri">https://github.com/Azure/azure-powershell</URI>
+      <Nil N="IconUri" />
+      <Obj N="Tags" RefId="5">
+        <TN RefId="3">
+          <T>System.Object[]</T>
+          <T>System.Array</T>
+          <T>System.Object</T>
+        </TN>
+        <LST>
+          <S>Azure</S>
+          <S>ResourceManager</S>
+          <S>ARM</S>
+          <S>PSModule</S>
+          <S>DeviceRegistry</S>
+          <S>PSEdition_Core</S>
+          <S>PSEdition_Desktop</S>
+        </LST>
+      </Obj>
+      <Obj N="Includes" RefId="6">
+        <TN RefId="4">
+          <T>System.Collections.Hashtable</T>
+          <T>System.Object</T>
+        </TN>
+        <DCT>
+          <En>
+            <S N="Key">RoleCapability</S>
+            <Obj N="Value" RefId="7">
+              <TNRef RefId="3" />
+              <LST />
+            </Obj>
+          </En>
+          <En>
+            <S N="Key">Workflow</S>
+            <Ref N="Value" RefId="7" />
+          </En>
+          <En>
+            <S N="Key">Command</S>
+            <Obj N="Value" RefId="8">
+              <TNRef RefId="3" />
+              <LST>
+                <S>Get-AzDeviceRegistryAsset</S>
+                <S>Get-AzDeviceRegistryAssetEndpointProfile</S>
+                <S>Get-AzDeviceRegistryBillingContainer</S>
+                <S>Get-AzDeviceRegistryNamespace</S>
+                <S>Get-AzDeviceRegistryNamespaceAsset</S>
+                <S>Get-AzDeviceRegistryNamespaceDevice</S>
+                <S>Get-AzDeviceRegistryNamespaceDiscoveredAsset</S>
+                <S>Get-AzDeviceRegistryNamespaceDiscoveredDevice</S>
+                <S>Get-AzDeviceRegistrySchema</S>
+                <S>Get-AzDeviceRegistrySchemaRegistry</S>
+                <S>Get-AzDeviceRegistrySchemaVersion</S>
+                <S>Move-AzDeviceRegistryNamespace</S>
+                <S>New-AzDeviceRegistryAsset</S>
+                <S>New-AzDeviceRegistryAssetEndpointProfile</S>
+                <S>New-AzDeviceRegistryNamespace</S>
+                <S>New-AzDeviceRegistryNamespaceAsset</S>
+                <S>New-AzDeviceRegistryNamespaceDevice</S>
+                <S>New-AzDeviceRegistryNamespaceDiscoveredAsset</S>
+                <S>New-AzDeviceRegistryNamespaceDiscoveredDevice</S>
+                <S>New-AzDeviceRegistrySchema</S>
+                <S>New-AzDeviceRegistrySchemaRegistry</S>
+                <S>New-AzDeviceRegistrySchemaVersion</S>
+                <S>Remove-AzDeviceRegistryAsset</S>
+                <S>Remove-AzDeviceRegistryAssetEndpointProfile</S>
+                <S>Remove-AzDeviceRegistryNamespace</S>
+                <S>Remove-AzDeviceRegistryNamespaceAsset</S>
+                <S>Remove-AzDeviceRegistryNamespaceDevice</S>
+                <S>Remove-AzDeviceRegistryNamespaceDiscoveredAsset</S>
+                <S>Remove-AzDeviceRegistryNamespaceDiscoveredDevice</S>
+                <S>Remove-AzDeviceRegistrySchema</S>
+                <S>Remove-AzDeviceRegistrySchemaRegistry</S>
+                <S>Remove-AzDeviceRegistrySchemaVersion</S>
+                <S>Update-AzDeviceRegistryAsset</S>
+                <S>Update-AzDeviceRegistryAssetEndpointProfile</S>
+                <S>Update-AzDeviceRegistryNamespace</S>
+                <S>Update-AzDeviceRegistryNamespaceAsset</S>
+                <S>Update-AzDeviceRegistryNamespaceDevice</S>
+                <S>Update-AzDeviceRegistryNamespaceDiscoveredAsset</S>
+                <S>Update-AzDeviceRegistryNamespaceDiscoveredDevice</S>
+                <S>Update-AzDeviceRegistrySchema</S>
+                <S>Update-AzDeviceRegistrySchemaRegistry</S>
+                <S>Update-AzDeviceRegistrySchemaVersion</S>
+              </LST>
+            </Obj>
+          </En>
+          <En>
+            <S N="Key">DscResource</S>
+            <Ref N="Value" RefId="7" />
+          </En>
+          <En>
+            <S N="Key">Function</S>
+            <Obj N="Value" RefId="9">
+              <TNRef RefId="3" />
+              <LST>
+                <S>Get-AzDeviceRegistryAsset</S>
+                <S>Get-AzDeviceRegistryAssetEndpointProfile</S>
+                <S>Get-AzDeviceRegistryBillingContainer</S>
+                <S>Get-AzDeviceRegistryNamespace</S>
+                <S>Get-AzDeviceRegistryNamespaceAsset</S>
+                <S>Get-AzDeviceRegistryNamespaceDevice</S>
+                <S>Get-AzDeviceRegistryNamespaceDiscoveredAsset</S>
+                <S>Get-AzDeviceRegistryNamespaceDiscoveredDevice</S>
+                <S>Get-AzDeviceRegistrySchema</S>
+                <S>Get-AzDeviceRegistrySchemaRegistry</S>
+                <S>Get-AzDeviceRegistrySchemaVersion</S>
+                <S>Move-AzDeviceRegistryNamespace</S>
+                <S>New-AzDeviceRegistryAsset</S>
+                <S>New-AzDeviceRegistryAssetEndpointProfile</S>
+                <S>New-AzDeviceRegistryNamespace</S>
+                <S>New-AzDeviceRegistryNamespaceAsset</S>
+                <S>New-AzDeviceRegistryNamespaceDevice</S>
+                <S>New-AzDeviceRegistryNamespaceDiscoveredAsset</S>
+                <S>New-AzDeviceRegistryNamespaceDiscoveredDevice</S>
+                <S>New-AzDeviceRegistrySchema</S>
+                <S>New-AzDeviceRegistrySchemaRegistry</S>
+                <S>New-AzDeviceRegistrySchemaVersion</S>
+                <S>Remove-AzDeviceRegistryAsset</S>
+                <S>Remove-AzDeviceRegistryAssetEndpointProfile</S>
+                <S>Remove-AzDeviceRegistryNamespace</S>
+                <S>Remove-AzDeviceRegistryNamespaceAsset</S>
+                <S>Remove-AzDeviceRegistryNamespaceDevice</S>
+                <S>Remove-AzDeviceRegistryNamespaceDiscoveredAsset</S>
+                <S>Remove-AzDeviceRegistryNamespaceDiscoveredDevice</S>
+                <S>Remove-AzDeviceRegistrySchema</S>
+                <S>Remove-AzDeviceRegistrySchemaRegistry</S>
+                <S>Remove-AzDeviceRegistrySchemaVersion</S>
+                <S>Update-AzDeviceRegistryAsset</S>
+                <S>Update-AzDeviceRegistryAssetEndpointProfile</S>
+                <S>Update-AzDeviceRegistryNamespace</S>
+                <S>Update-AzDeviceRegistryNamespaceAsset</S>
+                <S>Update-AzDeviceRegistryNamespaceDevice</S>
+                <S>Update-AzDeviceRegistryNamespaceDiscoveredAsset</S>
+                <S>Update-AzDeviceRegistryNamespaceDiscoveredDevice</S>
+                <S>Update-AzDeviceRegistrySchema</S>
+                <S>Update-AzDeviceRegistrySchemaRegistry</S>
+                <S>Update-AzDeviceRegistrySchemaVersion</S>
+              </LST>
+            </Obj>
+          </En>
+          <En>
+            <S N="Key">Cmdlet</S>
+            <Ref N="Value" RefId="7" />
+          </En>
+        </DCT>
+      </Obj>
+      <Nil N="PowerShellGetFormatVersion" />
+      <S N="ReleaseNotes">* General availability for module Az.DeviceRegistry_x000D__x000A_* GA stable release of API version 2025-10-01 for Az.DeviceRegistry. New updates include:_x000D__x000A_    - Schema and Schema Version asynchronous delete. No longer synchronous._x000D__x000A_    - Namespace Asset and Namespace Discovered Asset EventGroups._x000D__x000A_    - Namespace Device x509 certificate authentication now supports intermediate certificates and key secret names.</S>
+      <Obj N="Dependencies" RefId="10">
+        <TNRef RefId="3" />
+        <LST>
+          <Obj RefId="11">
+            <TN RefId="5">
+              <T>System.Collections.Specialized.OrderedDictionary</T>
+              <T>System.Object</T>
+            </TN>
+            <DCT>
+              <En>
+                <S N="Key">Name</S>
+                <S N="Value">Az.Accounts</S>
+              </En>
+              <En>
+                <S N="Key">MinimumVersion</S>
+                <S N="Value">5.3.0</S>
+              </En>
+              <En>
+                <S N="Key">CanonicalId</S>
+                <S N="Value">nuget:Az.Accounts/5.3.0</S>
+              </En>
+            </DCT>
+          </Obj>
+        </LST>
+      </Obj>
+      <S N="RepositorySourceLocation">https://www.powershellgallery.com/api/v2</S>
+      <S N="Repository">PSGallery</S>
+      <S N="PackageManagementProvider">NuGet</S>
+      <Obj N="AdditionalMetadata" RefId="12">
+        <TN RefId="6">
+          <T>System.Management.Automation.PSCustomObject</T>
+          <T>System.Object</T>
+        </TN>
+        <MS>
+          <S N="copyright">Microsoft Corporation. All rights reserved.</S>
+          <S N="description">Microsoft Azure PowerShell: DeviceRegistry cmdlets</S>
+          <S N="requireLicenseAcceptance">True</S>
+          <S N="releaseNotes">* General availability for module Az.DeviceRegistry_x000D__x000A_* GA stable release of API version 2025-10-01 for Az.DeviceRegistry. New updates include:_x000D__x000A_    - Schema and Schema Version asynchronous delete. No longer synchronous._x000D__x000A_    - Namespace Asset and Namespace Discovered Asset EventGroups._x000D__x000A_    - Namespace Device x509 certificate authentication now supports intermediate certificates and key secret names.</S>
+          <S N="isLatestVersion">True</S>
+          <S N="isAbsoluteLatestVersion">False</S>
+          <S N="versionDownloadCount">23444076</S>
+          <S N="downloadCount">23448892</S>
+          <S N="packageSize">1207678</S>
+          <S N="published">11/4/2025 1:50:18 AM -08:00</S>
+          <S N="created">11/4/2025 1:50:18 AM -08:00</S>
+          <S N="lastUpdated">3/5/2026 5:40:13 PM -08:00</S>
+          <S N="tags">Azure ResourceManager ARM PSModule DeviceRegistry PSEdition_Core PSEdition_Desktop PSFunction_Get-AzDeviceRegistryAsset PSCommand_Get-AzDeviceRegistryAsset PSFunction_Get-AzDeviceRegistryAssetEndpointProfile PSCommand_Get-AzDeviceRegistryAssetEndpointProfile PSFunction_Get-AzDeviceRegistryBillingContainer PSCommand_Get-AzDeviceRegistryBillingContainer PSFunction_Get-AzDeviceRegistryNamespace PSCommand_Get-AzDeviceRegistryNamespace PSFunction_Get-AzDeviceRegistryNamespaceAsset PSCommand_Get-AzDeviceRegistryNamespaceAsset PSFunction_Get-AzDeviceRegistryNamespaceDevice PSCommand_Get-AzDeviceRegistryNamespaceDevice PSFunction_Get-AzDeviceRegistryNamespaceDiscoveredAsset PSCommand_Get-AzDeviceRegistryNamespaceDiscoveredAsset PSFunction_Get-AzDeviceRegistryNamespaceDiscoveredDevice PSCommand_Get-AzDeviceRegistryNamespaceDiscoveredDevice PSFunction_Get-AzDeviceRegistrySchema PSCommand_Get-AzDeviceRegistrySchema PSFunction_Get-AzDeviceRegistrySchemaRegistry PSCommand_Get-AzDeviceRegistrySchemaRegistry PSFunction_Get-AzDeviceRegistrySchemaVersion PSCommand_Get-AzDeviceRegistrySchemaVersion PSFunction_Move-AzDeviceRegistryNamespace PSCommand_Move-AzDeviceRegistryNamespace PSFunction_New-AzDeviceRegistryAsset PSCommand_New-AzDeviceRegistryAsset PSFunction_New-AzDeviceRegistryAssetEndpointProfile PSCommand_New-AzDeviceRegistryAssetEndpointProfile PSFunction_New-AzDeviceRegistryNamespace PSCommand_New-AzDeviceRegistryNamespace PSFunction_New-AzDeviceRegistryNamespaceAsset PSCommand_New-AzDeviceRegistryNamespaceAsset PSFunction_New-AzDeviceRegistryNamespaceDevice PSCommand_New-AzDeviceRegistryNamespaceDevice PSFunction_New-AzDeviceRegistryNamespaceDiscoveredAsset PSCommand_New-AzDeviceRegistryNamespaceDiscoveredAsset PSFunction_New-AzDeviceRegistryNamespaceDiscoveredDevice PSCommand_New-AzDeviceRegistryNamespaceDiscoveredDevice PSFunction_New-AzDeviceRegistrySchema PSCommand_New-AzDeviceRegistrySchema PSFunction_New-AzDeviceRegistrySchemaRegistry PSCommand_New-AzDeviceRegistrySchemaRegistry PSFunction_New-AzDeviceRegistrySchemaVersion PSCommand_New-AzDeviceRegistrySchemaVersion PSFunction_Remove-AzDeviceRegistryAsset PSCommand_Remove-AzDeviceRegistryAsset PSFunction_Remove-AzDeviceRegistryAssetEndpointProfile PSCommand_Remove-AzDeviceRegistryAssetEndpointProfile PSFunction_Remove-AzDeviceRegistryNamespace PSCommand_Remove-AzDeviceRegistryNamespace PSFunction_Remove-AzDeviceRegistryNamespaceAsset PSCommand_Remove-AzDeviceRegistryNamespaceAsset PSFunction_Remove-AzDeviceRegistryNamespaceDevice PSCommand_Remove-AzDeviceRegistryNamespaceDevice PSFunction_Remove-AzDeviceRegistryNamespaceDiscoveredAsset PSCommand_Remove-AzDeviceRegistryNamespaceDiscoveredAsset PSFunction_Remove-AzDeviceRegistryNamespaceDiscoveredDevice PSCommand_Remove-AzDeviceRegistryNamespaceDiscoveredDevice PSFunction_Remove-AzDeviceRegistrySchema PSCommand_Remove-AzDeviceRegistrySchema PSFunction_Remove-AzDeviceRegistrySchemaRegistry PSCommand_Remove-AzDeviceRegistrySchemaRegistry PSFunction_Remove-AzDeviceRegistrySchemaVersion PSCommand_Remove-AzDeviceRegistrySchemaVersion PSFunction_Update-AzDeviceRegistryAsset PSCommand_Update-AzDeviceRegistryAsset PSFunction_Update-AzDeviceRegistryAssetEndpointProfile PSCommand_Update-AzDeviceRegistryAssetEndpointProfile PSFunction_Update-AzDeviceRegistryNamespace PSCommand_Update-AzDeviceRegistryNamespace PSFunction_Update-AzDeviceRegistryNamespaceAsset PSCommand_Update-AzDeviceRegistryNamespaceAsset PSFunction_Update-AzDeviceRegistryNamespaceDevice PSCommand_Update-AzDeviceRegistryNamespaceDevice PSFunction_Update-AzDeviceRegistryNamespaceDiscoveredAsset PSCommand_Update-AzDeviceRegistryNamespaceDiscoveredAsset PSFunction_Update-AzDeviceRegistryNamespaceDiscoveredDevice PSCommand_Update-AzDeviceRegistryNamespaceDiscoveredDevice PSFunction_Update-AzDeviceRegistrySchema PSCommand_Update-AzDeviceRegistrySchema PSFunction_Update-AzDeviceRegistrySchemaRegistry PSCommand_Update-AzDeviceRegistrySchemaRegistry PSFunction_Update-AzDeviceRegistrySchemaVersion PSCommand_Update-AzDeviceRegistrySchemaVersion PSIncludes_Function</S>
+          <S N="developmentDependency">False</S>
+          <S N="updated">2026-03-05T17:40:13Z</S>
+          <S N="NormalizedVersion">1.0.0</S>
+          <S N="Authors">Microsoft Corporation</S>
+          <S N="IsPrerelease">false</S>
+          <S N="ItemType">Module</S>
+          <S N="FileList">Az.DeviceRegistry.nuspec|Az.DeviceRegistry.psd1|Az.DeviceRegistry.psm1|DeviceRegistry.Autorest\Az.DeviceRegistry.format.ps1xml|DeviceRegistry.Autorest\Az.DeviceRegistry.psm1|DeviceRegistry.Autorest\bin\Az.DeviceRegistry.private.dll|DeviceRegistry.Autorest\custom\Az.DeviceRegistry.custom.psm1|DeviceRegistry.Autorest\exports\ProxyCmdletDefinitions.ps1|DeviceRegistry.Autorest\internal\Az.DeviceRegistry.internal.psm1|DeviceRegistry.Autorest\internal\ProxyCmdletDefinitions.ps1|DeviceRegistry.Autorest\utils\Get-SubscriptionIdTestSafe.ps1|DeviceRegistry.Autorest\utils\Unprotect-SecureString.ps1|.signature.p7s</S>
+          <S N="GUID">accceef6-8113-453a-a31c-4f2ce57893d6</S>
+          <S N="PowerShellVersion">5.1</S>
+          <S N="DotNetFrameworkVersion">4.7.2</S>
+          <S N="CompanyName">Microsoft Corporation</S>
+        </MS>
+      </Obj>
+      <S N="InstalledLocation">C:\Users\OmarRugel\Documents\PowerShell\Modules\Az.DeviceRegistry\1.0.0</S>
+    </MS>
+  </Obj>
+</Objs>

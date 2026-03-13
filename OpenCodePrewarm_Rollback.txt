@@ -1,0 +1,31 @@
+OpenCode Prewarm Rollback Instructions
+=====================================
+
+**Current Setup:**
+- PowerShell profile no longer runs OpenCode prewarm.
+- A scheduled task named `OpenCodePrewarm` runs `opencode.exe --prewarm` at Windows logon.
+
+**To Roll Back:**
+
+1. Remove the scheduled task:
+   ```powershell
+   Unregister-ScheduledTask -TaskName "OpenCodePrewarm" -Confirm:$false
+   ```
+
+2. Restore the prewarm job in your PowerShell profile (add near top):
+   ```powershell
+   try {
+       Start-Job -ScriptBlock {
+           try {
+               & "$env:USERPROFILE\.opencode\bin\opencode.exe" --prewarm 2>$null 3>$null
+           } catch { }
+       } | Out-Null
+   } catch { }
+   ```
+
+3. Reload your profile:
+   ```powershell
+   . $PROFILE
+   ```
+
+That will restore the old behavior (prewarm running on each PowerShell startup).

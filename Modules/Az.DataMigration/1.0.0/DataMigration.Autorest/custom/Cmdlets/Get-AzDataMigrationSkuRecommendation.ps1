@@ -1,0 +1,403 @@
+# ----------------------------------------------------------------------------------
+#
+# Copyright Microsoft Corporation
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# http://www.apache.org/licenses/LICENSE-2.0
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ----------------------------------------------------------------------------------
+<#
+.Synopsis
+Gives SKU recommendations for Azure SQL offerings.
+.Description
+Gives SKU recommendations for Azure SQL offerings (including SQL Database, SQL Managed Instance, and SQL on Azure VM) that best suit your workload while also being cost-effective.
+#>
+
+function Get-AzDataMigrationSkuRecommendation
+{
+    [OutputType([System.Boolean])]
+    [CmdletBinding(PositionalBinding=$false)]
+    [Microsoft.Azure.PowerShell.Cmdlets.DataMigration.Description('Gives SKU recommendations for Azure SQL offerings')]
+
+    param(
+                  
+        [Parameter(ParameterSetName='CommandLine', HelpMessage='Folder which data and result reports will be written to/read from. The value here must be the same as the one used in PerfDataCollection')]
+        [System.String]
+        ${OutputFolder},
+
+        [Parameter(ParameterSetName='CommandLine', HelpMessage='Optional. Target platform for SKU recommendation: either AzureSqlDatabase, AzureSqlManagedInstance, AzureSqlVirtualMachine, or Any. If Any is selected, then SKU recommendations for all three target platforms will be evaluated, and the best fit will be returned. (Default: Any)')]
+        [System.String]
+        ${TargetPlatform},
+
+        [Parameter(ParameterSetName='CommandLine', HelpMessage='Optional. Name of the SQL instance that SKU recommendation will be targeting. (Default: outputFolder will be scanned for files created by the PerfDataCollection action, and recommendations will be provided for every instance found)')]
+        [System.String]
+        ${TargetSqlInstance},
+
+        [Parameter(ParameterSetName='CommandLine', HelpMessage='Optional. Percentile of data points to be used during aggregation of the performance data. Only used for baseline (non-elastic) strategy. (Default: 95)')]
+        [System.String]
+        ${TargetPercentile},
+
+        [Parameter(ParameterSetName='CommandLine', HelpMessage='Optional. Scaling (comfort) factor used during SKU recommendation. For example, if it is determined that there is a 4 vCore CPU requirement with a scaling factor of 150%, then the true CPU requirement will be 6 vCores. (Default: 100)')]
+        [System.String]
+        ${ScalingFactor},
+
+        [Parameter(ParameterSetName='CommandLine', HelpMessage='Optional. UTC start time of performance data points to consider during aggregation, in YYYY-MM-DD HH:MM format. Only used for baseline (non-elastic) strategy. (Default: all data points collected will be considered)')]
+        [System.String]
+        ${StartTime},
+
+        [Parameter(ParameterSetName='CommandLine', HelpMessage='Optional. UTC end time of performance data points to consider during aggregation, in YYYY-MM-DD HH:MM format. Only used for baseline (non-elastic) strategy. (Default: all data points collected will be considered)')]
+        [System.String]
+        ${EndTime},
+
+        [Parameter(ParameterSetName='CommandLine', HelpMessage='Optional. Whether or not to overwrite any existing SKU recommendation reports.')]
+        [System.Management.Automation.SwitchParameter]
+        ${Overwrite},
+
+        [Parameter(ParameterSetName='CommandLine', HelpMessage='Optional. Whether or not to print the SKU recommendation results to the console.')]
+        [System.Management.Automation.SwitchParameter]
+        ${DisplayResult},
+
+        [Parameter(ParameterSetName='CommandLine', HelpMessage='Optional. Whether or not to use the elastic strategy for SKU recommendations based on resource usage profiling.')]
+        [System.Management.Automation.SwitchParameter]
+        ${ElasticStrategy},
+
+        [Parameter(ParameterSetName='CommandLine', HelpMessage='Optional. Space separated list of names of databases to be allowed for SKU recommendation consideration while excluding all others. Only set one of the following or neither: databaseAllowList, databaseDenyList. How to pass - "Database1 Database2" (Default: null)')]
+        [System.String]
+        ${DatabaseAllowList},
+
+        [Parameter(ParameterSetName='CommandLine', HelpMessage='Optional. Space separated list of names of databases to not be considered for SKU recommendation. Only set one of the following or neither: databaseAllowList, databaseDenyList. How to pass - "Database1 Database2" (Default: null)
+        ')]
+        [System.String]
+        ${DatabaseDenyList},
+
+        [Parameter(ParameterSetName='ConfigFile', Mandatory, HelpMessage='Path of the ConfigFile')]
+        [System.String]
+        ${ConfigFilePath},
+
+        [Parameter()]
+        [Microsoft.Azure.PowerShell.Cmdlets.DataMigration.Category('Runtime')]
+        [System.Management.Automation.SwitchParameter]
+        # Returns true when the command succeeds
+        ${PassThru}
+    )
+
+    process 
+    {
+        try 
+        {
+            $OSPlatform = Get-OSName
+
+            if(-Not $OSPlatform.Contains("Windows"))
+            {
+                throw "This command cannot be run in non-windows environment"
+                Break;
+            }
+            #Defining Default Output Path
+            $DefaultOutputFolder = Get-DefaultOutputFolder
+
+            #Defining Base and Exe paths
+            $BaseFolder = Join-Path -Path $DefaultOutputFolder -ChildPath Downloads;
+            $ExePath = Join-Path -Path $BaseFolder -ChildPath SqlAssessment.Console.csproj\SqlAssessment.exe;
+
+            #Checking if BaseFolder Path is valid or not
+            if(-Not (Test-Path $BaseFolder))
+            {
+                $null = New-Item -Path $BaseFolder -ItemType "directory"
+            }
+
+            #Testing Whether Console App is downloaded or not
+            $TestExePath =  Test-Path -Path $ExePath;
+
+            #Downloading and extracting SqlAssessment Zip file
+            if(-Not $TestExePath)
+            {
+                $ZipSource = "https://aka.ms/sqlassessmentpackage";
+                $ZipDestination = Join-Path -Path $BaseFolder -ChildPath "SqlAssessment.zip";
+                Invoke-RestMethod -Uri $ZipSource -OutFile $ZipDestination;
+
+                Expand-Archive -Path $ZipDestination -DestinationPath $BaseFolder -Force;
+            }
+
+            #Collecting performance data
+            if(('CommandLine') -contains $PSCmdlet.ParameterSetName)
+            {
+                # The array list $splat contains all the parameters that will be passed to '.\SqlAssessment.exe GetSkuRecommendation'
+
+                $DatabaseAllowList2 = $($DatabaseAllowList -split " ")
+                $DatabaseDenyList2 = $($DatabaseDenyList -split " ")
+                [System.Collections.ArrayList] $splat = @(
+                    '--outputFolder', $OutputFolder
+                    '--targetPlatform', $TargetPlatform
+                    '--targetSqlInstance', $TargetSqlInstance
+                    '--scalingFactor', $ScalingFactor
+                    '--targetPercentile', $TargetPercentile
+                    '--startTime', $StartTime
+                    '--endTime', $EndTime
+                    '--overwrite', $Overwrite
+                    '--displayResult', $DisplayResult
+                    '--elasticStrategy', $ElasticStrategy
+                    '--databaseAllowList', $DatabaseAllowList2
+                    '--databaseDenyList', $DatabaseDenyList2
+                )
+                # Removing the parameters for which the user did not provide any values
+                for($i = $splat.Count-1; $i -gt -1; $i = $i-2)
+                {
+                    $currVal = $splat[$i]
+                    if($currVal -ne "")
+                    {
+                    }
+                    else {
+                        $splat.RemoveAt($i)
+                        $i2 = $i -1
+                        $splat.RemoveAt($i2)
+    
+                    }                       
+                }
+                # Running GetSkuRecommendation                
+                & $ExePath GetSkuRecommendation @splat
+            }
+            else
+            {   
+                Test-ConfigFile $PSBoundParameters.ConfigFilePath "GetSkuRecommendation"
+                & $ExePath --configFile $PSBoundParameters.ConfigFilePath
+            }
+
+            $LogFilePath = Join-Path -Path $DefaultOutputFolder -ChildPath Logs;
+            Write-Host "Event and Error Logs Folder Path: $LogFilePath";
+
+            if($PSBoundParameters.ContainsKey("PassThru"))
+            {
+                return $true;
+            }
+        }
+        catch 
+        {
+            throw $_
+        }
+    }
+}
+
+
+
+# SIG # Begin signature block
+# MIIoPAYJKoZIhvcNAQcCoIIoLTCCKCkCAQExDzANBglghkgBZQMEAgEFADB5Bgor
+# BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCA92vc36nHAmKqV
+# duPC7EkvbhEaqGwMnK8tm8j2RPDC46CCDYUwggYDMIID66ADAgECAhMzAAAEhJji
+# EuB4ozFdAAAAAASEMA0GCSqGSIb3DQEBCwUAMH4xCzAJBgNVBAYTAlVTMRMwEQYD
+# VQQIEwpXYXNoaW5ndG9uMRAwDgYDVQQHEwdSZWRtb25kMR4wHAYDVQQKExVNaWNy
+# b3NvZnQgQ29ycG9yYXRpb24xKDAmBgNVBAMTH01pY3Jvc29mdCBDb2RlIFNpZ25p
+# bmcgUENBIDIwMTEwHhcNMjUwNjE5MTgyMTM1WhcNMjYwNjE3MTgyMTM1WjB0MQsw
+# CQYDVQQGEwJVUzETMBEGA1UECBMKV2FzaGluZ3RvbjEQMA4GA1UEBxMHUmVkbW9u
+# ZDEeMBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMR4wHAYDVQQDExVNaWNy
+# b3NvZnQgQ29ycG9yYXRpb24wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIB
+# AQDtekqMKDnzfsyc1T1QpHfFtr+rkir8ldzLPKmMXbRDouVXAsvBfd6E82tPj4Yz
+# aSluGDQoX3NpMKooKeVFjjNRq37yyT/h1QTLMB8dpmsZ/70UM+U/sYxvt1PWWxLj
+# MNIXqzB8PjG6i7H2YFgk4YOhfGSekvnzW13dLAtfjD0wiwREPvCNlilRz7XoFde5
+# KO01eFiWeteh48qUOqUaAkIznC4XB3sFd1LWUmupXHK05QfJSmnei9qZJBYTt8Zh
+# ArGDh7nQn+Y1jOA3oBiCUJ4n1CMaWdDhrgdMuu026oWAbfC3prqkUn8LWp28H+2S
+# LetNG5KQZZwvy3Zcn7+PQGl5AgMBAAGjggGCMIIBfjAfBgNVHSUEGDAWBgorBgEE
+# AYI3TAgBBggrBgEFBQcDAzAdBgNVHQ4EFgQUBN/0b6Fh6nMdE4FAxYG9kWCpbYUw
+# VAYDVR0RBE0wS6RJMEcxLTArBgNVBAsTJE1pY3Jvc29mdCBJcmVsYW5kIE9wZXJh
+# dGlvbnMgTGltaXRlZDEWMBQGA1UEBRMNMjMwMDEyKzUwNTM2MjAfBgNVHSMEGDAW
+# gBRIbmTlUAXTgqoXNzcitW2oynUClTBUBgNVHR8ETTBLMEmgR6BFhkNodHRwOi8v
+# d3d3Lm1pY3Jvc29mdC5jb20vcGtpb3BzL2NybC9NaWNDb2RTaWdQQ0EyMDExXzIw
+# MTEtMDctMDguY3JsMGEGCCsGAQUFBwEBBFUwUzBRBggrBgEFBQcwAoZFaHR0cDov
+# L3d3dy5taWNyb3NvZnQuY29tL3BraW9wcy9jZXJ0cy9NaWNDb2RTaWdQQ0EyMDEx
+# XzIwMTEtMDctMDguY3J0MAwGA1UdEwEB/wQCMAAwDQYJKoZIhvcNAQELBQADggIB
+# AGLQps1XU4RTcoDIDLP6QG3NnRE3p/WSMp61Cs8Z+JUv3xJWGtBzYmCINmHVFv6i
+# 8pYF/e79FNK6P1oKjduxqHSicBdg8Mj0k8kDFA/0eU26bPBRQUIaiWrhsDOrXWdL
+# m7Zmu516oQoUWcINs4jBfjDEVV4bmgQYfe+4/MUJwQJ9h6mfE+kcCP4HlP4ChIQB
+# UHoSymakcTBvZw+Qst7sbdt5KnQKkSEN01CzPG1awClCI6zLKf/vKIwnqHw/+Wvc
+# Ar7gwKlWNmLwTNi807r9rWsXQep1Q8YMkIuGmZ0a1qCd3GuOkSRznz2/0ojeZVYh
+# ZyohCQi1Bs+xfRkv/fy0HfV3mNyO22dFUvHzBZgqE5FbGjmUnrSr1x8lCrK+s4A+
+# bOGp2IejOphWoZEPGOco/HEznZ5Lk6w6W+E2Jy3PHoFE0Y8TtkSE4/80Y2lBJhLj
+# 27d8ueJ8IdQhSpL/WzTjjnuYH7Dx5o9pWdIGSaFNYuSqOYxrVW7N4AEQVRDZeqDc
+# fqPG3O6r5SNsxXbd71DCIQURtUKss53ON+vrlV0rjiKBIdwvMNLQ9zK0jy77owDy
+# XXoYkQxakN2uFIBO1UNAvCYXjs4rw3SRmBX9qiZ5ENxcn/pLMkiyb68QdwHUXz+1
+# fI6ea3/jjpNPz6Dlc/RMcXIWeMMkhup/XEbwu73U+uz/MIIHejCCBWKgAwIBAgIK
+# YQ6Q0gAAAAAAAzANBgkqhkiG9w0BAQsFADCBiDELMAkGA1UEBhMCVVMxEzARBgNV
+# BAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1vbmQxHjAcBgNVBAoTFU1pY3Jv
+# c29mdCBDb3Jwb3JhdGlvbjEyMDAGA1UEAxMpTWljcm9zb2Z0IFJvb3QgQ2VydGlm
+# aWNhdGUgQXV0aG9yaXR5IDIwMTEwHhcNMTEwNzA4MjA1OTA5WhcNMjYwNzA4MjEw
+# OTA5WjB+MQswCQYDVQQGEwJVUzETMBEGA1UECBMKV2FzaGluZ3RvbjEQMA4GA1UE
+# BxMHUmVkbW9uZDEeMBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMSgwJgYD
+# VQQDEx9NaWNyb3NvZnQgQ29kZSBTaWduaW5nIFBDQSAyMDExMIICIjANBgkqhkiG
+# 9w0BAQEFAAOCAg8AMIICCgKCAgEAq/D6chAcLq3YbqqCEE00uvK2WCGfQhsqa+la
+# UKq4BjgaBEm6f8MMHt03a8YS2AvwOMKZBrDIOdUBFDFC04kNeWSHfpRgJGyvnkmc
+# 6Whe0t+bU7IKLMOv2akrrnoJr9eWWcpgGgXpZnboMlImEi/nqwhQz7NEt13YxC4D
+# dato88tt8zpcoRb0RrrgOGSsbmQ1eKagYw8t00CT+OPeBw3VXHmlSSnnDb6gE3e+
+# lD3v++MrWhAfTVYoonpy4BI6t0le2O3tQ5GD2Xuye4Yb2T6xjF3oiU+EGvKhL1nk
+# kDstrjNYxbc+/jLTswM9sbKvkjh+0p2ALPVOVpEhNSXDOW5kf1O6nA+tGSOEy/S6
+# A4aN91/w0FK/jJSHvMAhdCVfGCi2zCcoOCWYOUo2z3yxkq4cI6epZuxhH2rhKEmd
+# X4jiJV3TIUs+UsS1Vz8kA/DRelsv1SPjcF0PUUZ3s/gA4bysAoJf28AVs70b1FVL
+# 5zmhD+kjSbwYuER8ReTBw3J64HLnJN+/RpnF78IcV9uDjexNSTCnq47f7Fufr/zd
+# sGbiwZeBe+3W7UvnSSmnEyimp31ngOaKYnhfsi+E11ecXL93KCjx7W3DKI8sj0A3
+# T8HhhUSJxAlMxdSlQy90lfdu+HggWCwTXWCVmj5PM4TasIgX3p5O9JawvEagbJjS
+# 4NaIjAsCAwEAAaOCAe0wggHpMBAGCSsGAQQBgjcVAQQDAgEAMB0GA1UdDgQWBBRI
+# bmTlUAXTgqoXNzcitW2oynUClTAZBgkrBgEEAYI3FAIEDB4KAFMAdQBiAEMAQTAL
+# BgNVHQ8EBAMCAYYwDwYDVR0TAQH/BAUwAwEB/zAfBgNVHSMEGDAWgBRyLToCMZBD
+# uRQFTuHqp8cx0SOJNDBaBgNVHR8EUzBRME+gTaBLhklodHRwOi8vY3JsLm1pY3Jv
+# c29mdC5jb20vcGtpL2NybC9wcm9kdWN0cy9NaWNSb29DZXJBdXQyMDExXzIwMTFf
+# MDNfMjIuY3JsMF4GCCsGAQUFBwEBBFIwUDBOBggrBgEFBQcwAoZCaHR0cDovL3d3
+# dy5taWNyb3NvZnQuY29tL3BraS9jZXJ0cy9NaWNSb29DZXJBdXQyMDExXzIwMTFf
+# MDNfMjIuY3J0MIGfBgNVHSAEgZcwgZQwgZEGCSsGAQQBgjcuAzCBgzA/BggrBgEF
+# BQcCARYzaHR0cDovL3d3dy5taWNyb3NvZnQuY29tL3BraW9wcy9kb2NzL3ByaW1h
+# cnljcHMuaHRtMEAGCCsGAQUFBwICMDQeMiAdAEwAZQBnAGEAbABfAHAAbwBsAGkA
+# YwB5AF8AcwB0AGEAdABlAG0AZQBuAHQALiAdMA0GCSqGSIb3DQEBCwUAA4ICAQBn
+# 8oalmOBUeRou09h0ZyKbC5YR4WOSmUKWfdJ5DJDBZV8uLD74w3LRbYP+vj/oCso7
+# v0epo/Np22O/IjWll11lhJB9i0ZQVdgMknzSGksc8zxCi1LQsP1r4z4HLimb5j0b
+# pdS1HXeUOeLpZMlEPXh6I/MTfaaQdION9MsmAkYqwooQu6SpBQyb7Wj6aC6VoCo/
+# KmtYSWMfCWluWpiW5IP0wI/zRive/DvQvTXvbiWu5a8n7dDd8w6vmSiXmE0OPQvy
+# CInWH8MyGOLwxS3OW560STkKxgrCxq2u5bLZ2xWIUUVYODJxJxp/sfQn+N4sOiBp
+# mLJZiWhub6e3dMNABQamASooPoI/E01mC8CzTfXhj38cbxV9Rad25UAqZaPDXVJi
+# hsMdYzaXht/a8/jyFqGaJ+HNpZfQ7l1jQeNbB5yHPgZ3BtEGsXUfFL5hYbXw3MYb
+# BL7fQccOKO7eZS/sl/ahXJbYANahRr1Z85elCUtIEJmAH9AAKcWxm6U/RXceNcbS
+# oqKfenoi+kiVH6v7RyOA9Z74v2u3S5fi63V4GuzqN5l5GEv/1rMjaHXmr/r8i+sL
+# gOppO6/8MO0ETI7f33VtY5E90Z1WTk+/gFcioXgRMiF670EKsT/7qMykXcGhiJtX
+# cVZOSEXAQsmbdlsKgEhr/Xmfwb1tbWrJUnMTDXpQzTGCGg0wghoJAgEBMIGVMH4x
+# CzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpXYXNoaW5ndG9uMRAwDgYDVQQHEwdSZWRt
+# b25kMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xKDAmBgNVBAMTH01p
+# Y3Jvc29mdCBDb2RlIFNpZ25pbmcgUENBIDIwMTECEzMAAASEmOIS4HijMV0AAAAA
+# BIQwDQYJYIZIAWUDBAIBBQCgga4wGQYJKoZIhvcNAQkDMQwGCisGAQQBgjcCAQQw
+# HAYKKwYBBAGCNwIBCzEOMAwGCisGAQQBgjcCARUwLwYJKoZIhvcNAQkEMSIEIJWx
+# /GRzKxozc4WIzjT9OX5Jic/rWrq0GVFYGiKQ9hpBMEIGCisGAQQBgjcCAQwxNDAy
+# oBSAEgBNAGkAYwByAG8AcwBvAGYAdKEagBhodHRwOi8vd3d3Lm1pY3Jvc29mdC5j
+# b20wDQYJKoZIhvcNAQEBBQAEggEAz5rUDF5suNw8jYF2H1hI2zh9pwsYS1aHhtVr
+# UHcAR/lcSVN/BYaQO6nFsUR58EQyEuIzFfDi0FEbM3ecrinZ2c+jhLTNF/2l/zJe
+# qV0ZQV1JGGcqzRmUwaRW4sIEkvpkA4O4RTEu588jAaQY68vqBvVKA2rjDEOcZLXu
+# VwyRHaha+IabapewmpYD5sQOB0RafH4bNEe8SprLnrdHAoi3babCrvxHOAiz6PWL
+# GC0nft4YIwqS8TdUv8dZ70SLQWESpvp1Rwequu53kGt3ukZ4LVsi1XXPbDuGfO7l
+# UM5I4SqhXNWKhIaTJPo99eDPWhjAbAYwBLGjUwzjEcSlfz5vm6GCF5cwgheTBgor
+# BgEEAYI3AwMBMYIXgzCCF38GCSqGSIb3DQEHAqCCF3AwghdsAgEDMQ8wDQYJYIZI
+# AWUDBAIBBQAwggFSBgsqhkiG9w0BCRABBKCCAUEEggE9MIIBOQIBAQYKKwYBBAGE
+# WQoDATAxMA0GCWCGSAFlAwQCAQUABCBVsHfVfneu+/XSwyyczl58fG3k2dxqZnHg
+# Dvaccm32mAIGaMmGPVCPGBMyMDI1MTAwOTEyNDUxNC4yNjZaMASAAgH0oIHRpIHO
+# MIHLMQswCQYDVQQGEwJVUzETMBEGA1UECBMKV2FzaGluZ3RvbjEQMA4GA1UEBxMH
+# UmVkbW9uZDEeMBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMSUwIwYDVQQL
+# ExxNaWNyb3NvZnQgQW1lcmljYSBPcGVyYXRpb25zMScwJQYDVQQLEx5uU2hpZWxk
+# IFRTUyBFU046ODYwMy0wNUUwLUQ5NDcxJTAjBgNVBAMTHE1pY3Jvc29mdCBUaW1l
+# LVN0YW1wIFNlcnZpY2WgghHtMIIHIDCCBQigAwIBAgITMwAAAgcsETmJzYX7xQAB
+# AAACBzANBgkqhkiG9w0BAQsFADB8MQswCQYDVQQGEwJVUzETMBEGA1UECBMKV2Fz
+# aGluZ3RvbjEQMA4GA1UEBxMHUmVkbW9uZDEeMBwGA1UEChMVTWljcm9zb2Z0IENv
+# cnBvcmF0aW9uMSYwJAYDVQQDEx1NaWNyb3NvZnQgVGltZS1TdGFtcCBQQ0EgMjAx
+# MDAeFw0yNTAxMzAxOTQyNTJaFw0yNjA0MjIxOTQyNTJaMIHLMQswCQYDVQQGEwJV
+# UzETMBEGA1UECBMKV2FzaGluZ3RvbjEQMA4GA1UEBxMHUmVkbW9uZDEeMBwGA1UE
+# ChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMSUwIwYDVQQLExxNaWNyb3NvZnQgQW1l
+# cmljYSBPcGVyYXRpb25zMScwJQYDVQQLEx5uU2hpZWxkIFRTUyBFU046ODYwMy0w
+# NUUwLUQ5NDcxJTAjBgNVBAMTHE1pY3Jvc29mdCBUaW1lLVN0YW1wIFNlcnZpY2Uw
+# ggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQDFP/96dPmcfgODe3/nuFve
+# uBst/JmSxSkOn89ZFytHQm344iLoPqkVws+CiUejQabKf+/c7KU1nqwAmmtiPnG8
+# zm4Sl9+RJZaQ4Dx3qtA9mdQdS7Chf6YUbP4Z++8laNbTQigJoXCmzlV34vmC4zpF
+# rET4KAATjXSPK0sQuFhKr7ltNaMFGclXSnIhcnScj9QUDVLQpAsJtsKHyHN7cN74
+# aEXLpFGc1I+WYFRxaTgqSPqGRfEfuQ2yGrAbWjJYOXueeTA1MVKhW8zzSEpfjKeK
+# /t2XuKykpCUaKn5s8sqNbI3bHt/rE/pNzwWnAKz+POBRbJxIkmL+n/EMVir5u8uy
+# WPl1t88MK551AGVh+2H4ziR14YDxzyCG924gaonKjicYnWUBOtXrnPK6AS/LN6Y+
+# 8Kxh26a6vKbFbzaqWXAjzEiQ8EY9K9pYI/KCygixjDwHfUgVSWCyT8Kw7mGByUZm
+# RPPxXONluMe/P8CtBJMpuh8CBWyjvFfFmOSNRK8ETkUmlTUAR1CIOaeBqLGwscSh
+# FfyvDQrbChmhXib4nRMX5U9Yr9d7VcYHn6eZJsgyzh5QKlIbCQC/YvhFK42ceCBD
+# Mbc+Ot5R6T/Mwce5jVyVCmqXVxWOaQc4rA2nV7onMOZC6UvCG8LGFSZBnj1loDDL
+# Wo/I+RuRok2j/Q4zcMnwkQIDAQABo4IBSTCCAUUwHQYDVR0OBBYEFHK1UmLCvXrQ
+# CvR98JBq18/4zo0eMB8GA1UdIwQYMBaAFJ+nFV0AXmJdg/Tl0mWnG1M1GelyMF8G
+# A1UdHwRYMFYwVKBSoFCGTmh0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMv
+# Y3JsL01pY3Jvc29mdCUyMFRpbWUtU3RhbXAlMjBQQ0ElMjAyMDEwKDEpLmNybDBs
+# BggrBgEFBQcBAQRgMF4wXAYIKwYBBQUHMAKGUGh0dHA6Ly93d3cubWljcm9zb2Z0
+# LmNvbS9wa2lvcHMvY2VydHMvTWljcm9zb2Z0JTIwVGltZS1TdGFtcCUyMFBDQSUy
+# MDIwMTAoMSkuY3J0MAwGA1UdEwEB/wQCMAAwFgYDVR0lAQH/BAwwCgYIKwYBBQUH
+# AwgwDgYDVR0PAQH/BAQDAgeAMA0GCSqGSIb3DQEBCwUAA4ICAQDju0quPbnix0sl
+# EjD7j2224pYOPGTmdDvO0+bNRCNkZqUv07P04nf1If3Y/iJEmUaU7w12Fm582Imp
+# D/Kw2ClXrNKLPTBO6nfxvOPGtalpAl4wqoGgZxvpxb2yEunG4yZQ6EQOpg1dE9uO
+# Xoze3gD4Hjtcc75kca8yivowEI+rhXuVUWB7vog4TGUxKdnDvpk5GSGXnOhPDhdI
+# d+g6hRyXdZiwgEa+q9M9Xctz4TGhDgOKFsYxFhXNJZo9KRuGq6evhtyNduYrkzjD
+# tWS6gW8akR59UhuLGsVq+4AgqEY8WlXjQGM2OTkyBnlQLpB8qD7x9jRpY2Cq0OWW
+# lK0wfH/1zefrWN5+be87Sw2TPcIudIJn39bbDG7awKMVYDHfsPJ8ZvxgWkZuf6ZZ
+# Akph0eYGh3IV845taLkdLOCvw49Wxqha5Dmi2Ojh8Gja5v9kyY3KTFyX3T4C2scx
+# fgp/6xRd+DGOhNVPvVPa/3yRUqY5s5UYpy8DnbppV7nQO2se3HvCSbrb+yPyeob1
+# kUfMYa9fE2bEsoMbOaHRgGji8ZPt/Jd2bPfdQoBHcUOqPwjHBUIcSc7xdJZYjRb4
+# m81qxjma3DLjuOFljMZTYovRiGvEML9xZj2pHRUyv+s5v7VGwcM6rjNYM4qzZQM6
+# A2RGYJGU780GQG0QO98w+sucuTVrfTCCB3EwggVZoAMCAQICEzMAAAAVxedrngKb
+# SZkAAAAAABUwDQYJKoZIhvcNAQELBQAwgYgxCzAJBgNVBAYTAlVTMRMwEQYDVQQI
+# EwpXYXNoaW5ndG9uMRAwDgYDVQQHEwdSZWRtb25kMR4wHAYDVQQKExVNaWNyb3Nv
+# ZnQgQ29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBSb290IENlcnRpZmlj
+# YXRlIEF1dGhvcml0eSAyMDEwMB4XDTIxMDkzMDE4MjIyNVoXDTMwMDkzMDE4MzIy
+# NVowfDELMAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24xEDAOBgNVBAcT
+# B1JlZG1vbmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjEmMCQGA1UE
+# AxMdTWljcm9zb2Z0IFRpbWUtU3RhbXAgUENBIDIwMTAwggIiMA0GCSqGSIb3DQEB
+# AQUAA4ICDwAwggIKAoICAQDk4aZM57RyIQt5osvXJHm9DtWC0/3unAcH0qlsTnXI
+# yjVX9gF/bErg4r25PhdgM/9cT8dm95VTcVrifkpa/rg2Z4VGIwy1jRPPdzLAEBjo
+# YH1qUoNEt6aORmsHFPPFdvWGUNzBRMhxXFExN6AKOG6N7dcP2CZTfDlhAnrEqv1y
+# aa8dq6z2Nr41JmTamDu6GnszrYBbfowQHJ1S/rboYiXcag/PXfT+jlPP1uyFVk3v
+# 3byNpOORj7I5LFGc6XBpDco2LXCOMcg1KL3jtIckw+DJj361VI/c+gVVmG1oO5pG
+# ve2krnopN6zL64NF50ZuyjLVwIYwXE8s4mKyzbnijYjklqwBSru+cakXW2dg3viS
+# kR4dPf0gz3N9QZpGdc3EXzTdEonW/aUgfX782Z5F37ZyL9t9X4C626p+Nuw2TPYr
+# bqgSUei/BQOj0XOmTTd0lBw0gg/wEPK3Rxjtp+iZfD9M269ewvPV2HM9Q07BMzlM
+# jgK8QmguEOqEUUbi0b1qGFphAXPKZ6Je1yh2AuIzGHLXpyDwwvoSCtdjbwzJNmSL
+# W6CmgyFdXzB0kZSU2LlQ+QuJYfM2BjUYhEfb3BvR/bLUHMVr9lxSUV0S2yW6r1AF
+# emzFER1y7435UsSFF5PAPBXbGjfHCBUYP3irRbb1Hode2o+eFnJpxq57t7c+auIu
+# rQIDAQABo4IB3TCCAdkwEgYJKwYBBAGCNxUBBAUCAwEAATAjBgkrBgEEAYI3FQIE
+# FgQUKqdS/mTEmr6CkTxGNSnPEP8vBO4wHQYDVR0OBBYEFJ+nFV0AXmJdg/Tl0mWn
+# G1M1GelyMFwGA1UdIARVMFMwUQYMKwYBBAGCN0yDfQEBMEEwPwYIKwYBBQUHAgEW
+# M2h0dHA6Ly93d3cubWljcm9zb2Z0LmNvbS9wa2lvcHMvRG9jcy9SZXBvc2l0b3J5
+# Lmh0bTATBgNVHSUEDDAKBggrBgEFBQcDCDAZBgkrBgEEAYI3FAIEDB4KAFMAdQBi
+# AEMAQTALBgNVHQ8EBAMCAYYwDwYDVR0TAQH/BAUwAwEB/zAfBgNVHSMEGDAWgBTV
+# 9lbLj+iiXGJo0T2UkFvXzpoYxDBWBgNVHR8ETzBNMEugSaBHhkVodHRwOi8vY3Js
+# Lm1pY3Jvc29mdC5jb20vcGtpL2NybC9wcm9kdWN0cy9NaWNSb29DZXJBdXRfMjAx
+# MC0wNi0yMy5jcmwwWgYIKwYBBQUHAQEETjBMMEoGCCsGAQUFBzAChj5odHRwOi8v
+# d3d3Lm1pY3Jvc29mdC5jb20vcGtpL2NlcnRzL01pY1Jvb0NlckF1dF8yMDEwLTA2
+# LTIzLmNydDANBgkqhkiG9w0BAQsFAAOCAgEAnVV9/Cqt4SwfZwExJFvhnnJL/Klv
+# 6lwUtj5OR2R4sQaTlz0xM7U518JxNj/aZGx80HU5bbsPMeTCj/ts0aGUGCLu6WZn
+# OlNN3Zi6th542DYunKmCVgADsAW+iehp4LoJ7nvfam++Kctu2D9IdQHZGN5tggz1
+# bSNU5HhTdSRXud2f8449xvNo32X2pFaq95W2KFUn0CS9QKC/GbYSEhFdPSfgQJY4
+# rPf5KYnDvBewVIVCs/wMnosZiefwC2qBwoEZQhlSdYo2wh3DYXMuLGt7bj8sCXgU
+# 6ZGyqVvfSaN0DLzskYDSPeZKPmY7T7uG+jIa2Zb0j/aRAfbOxnT99kxybxCrdTDF
+# NLB62FD+CljdQDzHVG2dY3RILLFORy3BFARxv2T5JL5zbcqOCb2zAVdJVGTZc9d/
+# HltEAY5aGZFrDZ+kKNxnGSgkujhLmm77IVRrakURR6nxt67I6IleT53S0Ex2tVdU
+# CbFpAUR+fKFhbHP+CrvsQWY9af3LwUFJfn6Tvsv4O+S3Fb+0zj6lMVGEvL8CwYKi
+# excdFYmNcP7ntdAoGokLjzbaukz5m/8K6TT4JDVnK+ANuOaMmdbhIurwJ0I9JZTm
+# dHRbatGePu1+oDEzfbzL6Xu/OHBE0ZDxyKs6ijoIYn/ZcGNTTY3ugm2lBRDBcQZq
+# ELQdVTNYs6FwZvKhggNQMIICOAIBATCB+aGB0aSBzjCByzELMAkGA1UEBhMCVVMx
+# EzARBgNVBAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1vbmQxHjAcBgNVBAoT
+# FU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjElMCMGA1UECxMcTWljcm9zb2Z0IEFtZXJp
+# Y2EgT3BlcmF0aW9uczEnMCUGA1UECxMeblNoaWVsZCBUU1MgRVNOOjg2MDMtMDVF
+# MC1EOTQ3MSUwIwYDVQQDExxNaWNyb3NvZnQgVGltZS1TdGFtcCBTZXJ2aWNloiMK
+# AQEwBwYFKw4DAhoDFQDTvVU/Yj9lUSyeDCaiJ2Da5hUiS6CBgzCBgKR+MHwxCzAJ
+# BgNVBAYTAlVTMRMwEQYDVQQIEwpXYXNoaW5ndG9uMRAwDgYDVQQHEwdSZWRtb25k
+# MR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xJjAkBgNVBAMTHU1pY3Jv
+# c29mdCBUaW1lLVN0YW1wIFBDQSAyMDEwMA0GCSqGSIb3DQEBCwUAAgUA7JGqtDAi
+# GA8yMDI1MTAwOTAzMjk1NloYDzIwMjUxMDEwMDMyOTU2WjB3MD0GCisGAQQBhFkK
+# BAExLzAtMAoCBQDskaq0AgEAMAoCAQACAg40AgH/MAcCAQACAheJMAoCBQDskvw0
+# AgEAMDYGCisGAQQBhFkKBAIxKDAmMAwGCisGAQQBhFkKAwKgCjAIAgEAAgMHoSCh
+# CjAIAgEAAgMBhqAwDQYJKoZIhvcNAQELBQADggEBAIvXvJsDaYPYpjK8HgvJq/Ro
+# Y2M74oz34QdLpHWkVg+6+EBgFXsUTV//nE3U8zkhWXPpphlCx3wDd0V3FmeioWwz
+# GFMGFpR9G2RjibZyXDq0aG/SwF2gF9eXuNQsc4yRe6dQWtjLqRl2NXcAIvOXun3n
+# l/aX6Rwv9qsAoDIu8CFB/xF8Ox65oQC/GrdIvNKt+P8DkeLz67TAYwdI5xfxTkUd
+# v5whearZ9Mqvpooq40Ox5uYqUYg47rzQg3Sd1RPSbBUVhEvPUlnSxU5ge8LqjKuE
+# c8RNIgD8jhvafQkgBU63XLZEm6wYmh4b+bFsytmlWmenngtu3iuedX9epgzk9Qcx
+# ggQNMIIECQIBATCBkzB8MQswCQYDVQQGEwJVUzETMBEGA1UECBMKV2FzaGluZ3Rv
+# bjEQMA4GA1UEBxMHUmVkbW9uZDEeMBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0
+# aW9uMSYwJAYDVQQDEx1NaWNyb3NvZnQgVGltZS1TdGFtcCBQQ0EgMjAxMAITMwAA
+# AgcsETmJzYX7xQABAAACBzANBglghkgBZQMEAgEFAKCCAUowGgYJKoZIhvcNAQkD
+# MQ0GCyqGSIb3DQEJEAEEMC8GCSqGSIb3DQEJBDEiBCAFhqgfgpD4pK1ttTOprTfV
+# b1LJYlCbj7ujFBQpqdqjqjCB+gYLKoZIhvcNAQkQAi8xgeowgecwgeQwgb0EIC/3
+# 1NHQds1IZ5sPnv59p+v6BjBDgoDPIwiAmn0PHqezMIGYMIGApH4wfDELMAkGA1UE
+# BhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1vbmQxHjAc
+# BgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjEmMCQGA1UEAxMdTWljcm9zb2Z0
+# IFRpbWUtU3RhbXAgUENBIDIwMTACEzMAAAIHLBE5ic2F+8UAAQAAAgcwIgQgUawV
+# QU3tHmdqZU1zloE70njmoCuXkTUo8Asb57P5mAYwDQYJKoZIhvcNAQELBQAEggIA
+# nRxlr+Tg4WghxkkDID6b5grk/GI8qvsdUhLtqGUnSkn90ZL7quLMFGX9iwq8qtS2
+# GnJNNWcPhyZFgn+yXevzmVkyVblCzLXzzMeKLRAXU2jdsbFD0le6EI/l5vrRoskv
+# 3LINSnZXC7rhXVqFWkqVEL9y3b1EYaiaOHZlqob+PwvzM1CY/XbwNgS3Q+iZ301A
+# +nfsMV9tZkfVB3cKvHXOS5fBO1QjFFTjjZdICsxsivJJgpzqcmM0ddUG/NcJmZeY
+# m6Uhk+9rMra+6AIM3Rz/Z/rZR2nnVpQ/7S4X9cNUMTHAoLjl3QOUbhmnw93XWn/9
+# ZnohsiXRw8UIHQhH3UTt59NHqPGtuO2r8jxfhEXN6nqjZzoGLwoi4N9O8ynow1cC
+# jh5rf+eI+Dd53chFsaLQefnUwX5mUDl8fu8aAO3V+j73CS0qlvtYwcrz/zlaK2Ad
+# 2H+5n1Z6joVfg+Xp13jQGC45fofMjkFHkQDCNBUQUU4NM7hHSK5WSJzmK78l9c/a
+# IG3WjLpRL+IZDw/RbOPu7mtzT/W2PNQ7U/mXtaHgnyOSTmdyPTa8SmbWjhkWwD8T
+# aEePFTxMZq1qvlop+ZPONXzOUyuIAHt9stJ9lQV+64jWgDRUtKYK0hAOKZGBAhCV
+# ABYuTJGfDOR6zQTMxDV99xrdtz1f9NMJI19QbHIXY64=
+# SIG # End signature block

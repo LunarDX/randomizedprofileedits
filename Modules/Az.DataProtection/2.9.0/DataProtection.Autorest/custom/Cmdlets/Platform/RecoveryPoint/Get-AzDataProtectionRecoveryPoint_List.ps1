@@ -1,0 +1,363 @@
+﻿function Get-AzDataProtectionRecoveryPoint_List
+{
+	[OutputType('PSObject')]
+    [CmdletBinding(PositionalBinding=$false)]
+    [Microsoft.Azure.PowerShell.Cmdlets.DataProtection.Description('Gets list of recovery point associated with a protected backup instance.')]
+
+    param(
+        [Parameter(Mandatory=$false, HelpMessage='Subscription Id of the vault')]
+        [System.String[]]
+        ${SubscriptionId},
+
+        [Parameter(HelpMessage='Resource Group of the backup vault')]
+        [System.String]
+        ${ResourceGroupName},
+
+        [Parameter(HelpMessage='Name of the backup vault')]
+        [System.String]
+        ${VaultName},
+
+        [Parameter(HelpMessage='Unique Name of protected backup instance')]
+        [System.String]
+        ${BackupInstanceName},
+
+        [Parameter(HelpMessage='Start Time filter for recovery points')]
+        [System.DateTime]
+        ${StartTime},
+
+        [Parameter(HelpMessage='End Time filter for recovery points')]
+        [System.DateTime]
+        ${EndTime},
+
+        [Parameter(Mandatory=$false, HelpMessage='Switch parameter to fetch recovery points from secondary region')]
+        [Switch]
+        ${UseSecondaryRegion},
+
+        [Parameter()]
+        [Alias('AzureRMContext', 'AzureCredential')]
+        [ValidateNotNull()]
+        [System.Management.Automation.PSObject]
+        # The credentials, account, tenant, and subscription used for communication with Azure.
+        ${DefaultProfile},
+    
+        [Parameter(DontShow)]
+        [System.Management.Automation.SwitchParameter]
+        # Wait for .NET debugger to attach
+        ${Break},
+    
+        [Parameter(DontShow)]
+        [ValidateNotNull()]
+        [Microsoft.Azure.PowerShell.Cmdlets.DataProtection.Runtime.SendAsyncStep[]]
+        # SendAsync Pipeline Steps to be appended to the front of the pipeline
+        ${HttpPipelineAppend},
+    
+        [Parameter(DontShow)]
+        [ValidateNotNull()]
+        [Microsoft.Azure.PowerShell.Cmdlets.DataProtection.Runtime.SendAsyncStep[]]
+        # SendAsync Pipeline Steps to be prepended to the front of the pipeline
+        ${HttpPipelinePrepend},
+    
+        [Parameter(DontShow)]
+        [System.Uri]
+        # The URI for the proxy server to use
+        ${Proxy},
+    
+        [Parameter(DontShow)]
+        [ValidateNotNull()]
+        [System.Management.Automation.PSCredential]
+        # Credentials for a proxy server to use for the remote call
+        ${ProxyCredential},
+    
+        [Parameter(DontShow)]
+        [System.Management.Automation.SwitchParameter]
+        # Use the default credentials for the proxy
+        ${ProxyUseDefaultCredentials}
+    )
+
+    process
+    {
+        $filter = ""
+        if($PSBoundParameters.ContainsKey("StartTime"))
+        {
+            $utcStartTime = $StartTime.ToUniversalTime()
+            $startTimeFilter = $utcStartTime.ToString("yyyy-MM-ddTHH:mm:ss.0000000Z")
+            $filter = "startDate eq '" + $startTimeFilter + "'"
+        }
+        if($PSBoundParameters.ContainsKey("EndTime"))
+        {
+            if($PSBoundParameters.ContainsKey("StartTime"))
+            {
+                $filter += " and "
+            }
+            $utcEndTime = $EndTime.ToUniversalTime()
+            $endTimeFilter = $utcEndTime.ToString("yyyy-MM-ddTHH:mm:ss.0000000Z")
+            $filter += "endDate eq '" + $endTimeFilter + "'"
+            $null = $PSBoundParameters.Remove("EndTime")
+        }
+
+        if($PSBoundParameters.ContainsKey("StartTime"))
+        {
+            $null = $PSBoundParameters.Remove("StartTime")
+        }
+
+        if($filter -ne "")
+        {
+            $null = $PSBoundParameters.Add("Filter", $filter)
+        }
+
+        $hasUseSecondaryRegion = $PSBoundParameters.Remove("UseSecondaryRegion")
+
+        $rps = $null
+        if($hasUseSecondaryRegion){
+
+            # fetch vault from ARG
+            $null = $PSBoundParameters.Remove("BackupInstanceName")
+            $hasFilter = $PSBoundParameters.Remove("Filter")            
+            $hasSubscriptionId = $PSBoundParameters.Remove("SubscriptionId")
+            $null = $PSBoundParameters.Remove("ResourceGroupName")
+            $null = $PSBoundParameters.Remove("VaultName")
+            $PSBoundParameters.Add('ResourceGroup', $ResourceGroupName)
+            $PSBoundParameters.Add('Vault', $VaultName)
+            if($hasSubscriptionId) { $PSBoundParameters.Add('Subscription', $SubscriptionId) }
+            
+            $vault = Search-AzDataProtectionBackupVaultInAzGraph @PSBoundParameters
+
+            $null = $PSBoundParameters.Remove("Subscription")
+            $null = $PSBoundParameters.Remove("ResourceGroup")
+            $null = $PSBoundParameters.Remove("Vault")
+            $PSBoundParameters.Add('ResourceGroupName', $ResourceGroupName)
+            if($hasSubscriptionId) { $PSBoundParameters.Add('SubscriptionId', $SubscriptionId) }
+            if($hasFilter) { $PSBoundParameters.Add('Filter', $Filter) }
+
+            $backupInstanceId = "/subscriptions/" + $SubscriptionId + "/resourceGroups/" + $ResourceGroupName + "/providers/Microsoft.DataProtection/backupVaults/" + $VaultName + "/backupInstances/" + $BackupInstanceName
+
+            $PSBoundParameters.Add('Location', $vault.ReplicatedRegion[0])
+            $PSBoundParameters.Add('SourceBackupInstanceId', $backupInstanceId)
+            $PSBoundParameters.Add('SourceRegion', $vault.Location)
+
+            $rps = Az.DataProtection.internal\Get-AzDataProtectionFetchSecondaryRecoveryPoint @PSBoundParameters
+        }
+        else{
+            $rps = Az.DataProtection.internal\Get-AzDataProtectionRecoveryPoint @PSBoundParameters
+        }
+        
+        return $rps
+    }
+}
+# SIG # Begin signature block
+# MIIoLAYJKoZIhvcNAQcCoIIoHTCCKBkCAQExDzANBglghkgBZQMEAgEFADB5Bgor
+# BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCBCc+JTOVBO2G0/
+# P3uO+Awxf+LzEgoPgXq2DIJny9gCgKCCDXYwggX0MIID3KADAgECAhMzAAAEhV6Z
+# 7A5ZL83XAAAAAASFMA0GCSqGSIb3DQEBCwUAMH4xCzAJBgNVBAYTAlVTMRMwEQYD
+# VQQIEwpXYXNoaW5ndG9uMRAwDgYDVQQHEwdSZWRtb25kMR4wHAYDVQQKExVNaWNy
+# b3NvZnQgQ29ycG9yYXRpb24xKDAmBgNVBAMTH01pY3Jvc29mdCBDb2RlIFNpZ25p
+# bmcgUENBIDIwMTEwHhcNMjUwNjE5MTgyMTM3WhcNMjYwNjE3MTgyMTM3WjB0MQsw
+# CQYDVQQGEwJVUzETMBEGA1UECBMKV2FzaGluZ3RvbjEQMA4GA1UEBxMHUmVkbW9u
+# ZDEeMBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMR4wHAYDVQQDExVNaWNy
+# b3NvZnQgQ29ycG9yYXRpb24wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIB
+# AQDASkh1cpvuUqfbqxele7LCSHEamVNBfFE4uY1FkGsAdUF/vnjpE1dnAD9vMOqy
+# 5ZO49ILhP4jiP/P2Pn9ao+5TDtKmcQ+pZdzbG7t43yRXJC3nXvTGQroodPi9USQi
+# 9rI+0gwuXRKBII7L+k3kMkKLmFrsWUjzgXVCLYa6ZH7BCALAcJWZTwWPoiT4HpqQ
+# hJcYLB7pfetAVCeBEVZD8itKQ6QA5/LQR+9X6dlSj4Vxta4JnpxvgSrkjXCz+tlJ
+# 67ABZ551lw23RWU1uyfgCfEFhBfiyPR2WSjskPl9ap6qrf8fNQ1sGYun2p4JdXxe
+# UAKf1hVa/3TQXjvPTiRXCnJPAgMBAAGjggFzMIIBbzAfBgNVHSUEGDAWBgorBgEE
+# AYI3TAgBBggrBgEFBQcDAzAdBgNVHQ4EFgQUuCZyGiCuLYE0aU7j5TFqY05kko0w
+# RQYDVR0RBD4wPKQ6MDgxHjAcBgNVBAsTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjEW
+# MBQGA1UEBRMNMjMwMDEyKzUwNTM1OTAfBgNVHSMEGDAWgBRIbmTlUAXTgqoXNzci
+# tW2oynUClTBUBgNVHR8ETTBLMEmgR6BFhkNodHRwOi8vd3d3Lm1pY3Jvc29mdC5j
+# b20vcGtpb3BzL2NybC9NaWNDb2RTaWdQQ0EyMDExXzIwMTEtMDctMDguY3JsMGEG
+# CCsGAQUFBwEBBFUwUzBRBggrBgEFBQcwAoZFaHR0cDovL3d3dy5taWNyb3NvZnQu
+# Y29tL3BraW9wcy9jZXJ0cy9NaWNDb2RTaWdQQ0EyMDExXzIwMTEtMDctMDguY3J0
+# MAwGA1UdEwEB/wQCMAAwDQYJKoZIhvcNAQELBQADggIBACjmqAp2Ci4sTHZci+qk
+# tEAKsFk5HNVGKyWR2rFGXsd7cggZ04H5U4SV0fAL6fOE9dLvt4I7HBHLhpGdE5Uj
+# Ly4NxLTG2bDAkeAVmxmd2uKWVGKym1aarDxXfv3GCN4mRX+Pn4c+py3S/6Kkt5eS
+# DAIIsrzKw3Kh2SW1hCwXX/k1v4b+NH1Fjl+i/xPJspXCFuZB4aC5FLT5fgbRKqns
+# WeAdn8DsrYQhT3QXLt6Nv3/dMzv7G/Cdpbdcoul8FYl+t3dmXM+SIClC3l2ae0wO
+# lNrQ42yQEycuPU5OoqLT85jsZ7+4CaScfFINlO7l7Y7r/xauqHbSPQ1r3oIC+e71
+# 5s2G3ClZa3y99aYx2lnXYe1srcrIx8NAXTViiypXVn9ZGmEkfNcfDiqGQwkml5z9
+# nm3pWiBZ69adaBBbAFEjyJG4y0a76bel/4sDCVvaZzLM3TFbxVO9BQrjZRtbJZbk
+# C3XArpLqZSfx53SuYdddxPX8pvcqFuEu8wcUeD05t9xNbJ4TtdAECJlEi0vvBxlm
+# M5tzFXy2qZeqPMXHSQYqPgZ9jvScZ6NwznFD0+33kbzyhOSz/WuGbAu4cHZG8gKn
+# lQVT4uA2Diex9DMs2WHiokNknYlLoUeWXW1QrJLpqO82TLyKTbBM/oZHAdIc0kzo
+# STro9b3+vjn2809D0+SOOCVZMIIHejCCBWKgAwIBAgIKYQ6Q0gAAAAAAAzANBgkq
+# hkiG9w0BAQsFADCBiDELMAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24x
+# EDAOBgNVBAcTB1JlZG1vbmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlv
+# bjEyMDAGA1UEAxMpTWljcm9zb2Z0IFJvb3QgQ2VydGlmaWNhdGUgQXV0aG9yaXR5
+# IDIwMTEwHhcNMTEwNzA4MjA1OTA5WhcNMjYwNzA4MjEwOTA5WjB+MQswCQYDVQQG
+# EwJVUzETMBEGA1UECBMKV2FzaGluZ3RvbjEQMA4GA1UEBxMHUmVkbW9uZDEeMBwG
+# A1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMSgwJgYDVQQDEx9NaWNyb3NvZnQg
+# Q29kZSBTaWduaW5nIFBDQSAyMDExMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIIC
+# CgKCAgEAq/D6chAcLq3YbqqCEE00uvK2WCGfQhsqa+laUKq4BjgaBEm6f8MMHt03
+# a8YS2AvwOMKZBrDIOdUBFDFC04kNeWSHfpRgJGyvnkmc6Whe0t+bU7IKLMOv2akr
+# rnoJr9eWWcpgGgXpZnboMlImEi/nqwhQz7NEt13YxC4Ddato88tt8zpcoRb0Rrrg
+# OGSsbmQ1eKagYw8t00CT+OPeBw3VXHmlSSnnDb6gE3e+lD3v++MrWhAfTVYoonpy
+# 4BI6t0le2O3tQ5GD2Xuye4Yb2T6xjF3oiU+EGvKhL1nkkDstrjNYxbc+/jLTswM9
+# sbKvkjh+0p2ALPVOVpEhNSXDOW5kf1O6nA+tGSOEy/S6A4aN91/w0FK/jJSHvMAh
+# dCVfGCi2zCcoOCWYOUo2z3yxkq4cI6epZuxhH2rhKEmdX4jiJV3TIUs+UsS1Vz8k
+# A/DRelsv1SPjcF0PUUZ3s/gA4bysAoJf28AVs70b1FVL5zmhD+kjSbwYuER8ReTB
+# w3J64HLnJN+/RpnF78IcV9uDjexNSTCnq47f7Fufr/zdsGbiwZeBe+3W7UvnSSmn
+# Eyimp31ngOaKYnhfsi+E11ecXL93KCjx7W3DKI8sj0A3T8HhhUSJxAlMxdSlQy90
+# lfdu+HggWCwTXWCVmj5PM4TasIgX3p5O9JawvEagbJjS4NaIjAsCAwEAAaOCAe0w
+# ggHpMBAGCSsGAQQBgjcVAQQDAgEAMB0GA1UdDgQWBBRIbmTlUAXTgqoXNzcitW2o
+# ynUClTAZBgkrBgEEAYI3FAIEDB4KAFMAdQBiAEMAQTALBgNVHQ8EBAMCAYYwDwYD
+# VR0TAQH/BAUwAwEB/zAfBgNVHSMEGDAWgBRyLToCMZBDuRQFTuHqp8cx0SOJNDBa
+# BgNVHR8EUzBRME+gTaBLhklodHRwOi8vY3JsLm1pY3Jvc29mdC5jb20vcGtpL2Ny
+# bC9wcm9kdWN0cy9NaWNSb29DZXJBdXQyMDExXzIwMTFfMDNfMjIuY3JsMF4GCCsG
+# AQUFBwEBBFIwUDBOBggrBgEFBQcwAoZCaHR0cDovL3d3dy5taWNyb3NvZnQuY29t
+# L3BraS9jZXJ0cy9NaWNSb29DZXJBdXQyMDExXzIwMTFfMDNfMjIuY3J0MIGfBgNV
+# HSAEgZcwgZQwgZEGCSsGAQQBgjcuAzCBgzA/BggrBgEFBQcCARYzaHR0cDovL3d3
+# dy5taWNyb3NvZnQuY29tL3BraW9wcy9kb2NzL3ByaW1hcnljcHMuaHRtMEAGCCsG
+# AQUFBwICMDQeMiAdAEwAZQBnAGEAbABfAHAAbwBsAGkAYwB5AF8AcwB0AGEAdABl
+# AG0AZQBuAHQALiAdMA0GCSqGSIb3DQEBCwUAA4ICAQBn8oalmOBUeRou09h0ZyKb
+# C5YR4WOSmUKWfdJ5DJDBZV8uLD74w3LRbYP+vj/oCso7v0epo/Np22O/IjWll11l
+# hJB9i0ZQVdgMknzSGksc8zxCi1LQsP1r4z4HLimb5j0bpdS1HXeUOeLpZMlEPXh6
+# I/MTfaaQdION9MsmAkYqwooQu6SpBQyb7Wj6aC6VoCo/KmtYSWMfCWluWpiW5IP0
+# wI/zRive/DvQvTXvbiWu5a8n7dDd8w6vmSiXmE0OPQvyCInWH8MyGOLwxS3OW560
+# STkKxgrCxq2u5bLZ2xWIUUVYODJxJxp/sfQn+N4sOiBpmLJZiWhub6e3dMNABQam
+# ASooPoI/E01mC8CzTfXhj38cbxV9Rad25UAqZaPDXVJihsMdYzaXht/a8/jyFqGa
+# J+HNpZfQ7l1jQeNbB5yHPgZ3BtEGsXUfFL5hYbXw3MYbBL7fQccOKO7eZS/sl/ah
+# XJbYANahRr1Z85elCUtIEJmAH9AAKcWxm6U/RXceNcbSoqKfenoi+kiVH6v7RyOA
+# 9Z74v2u3S5fi63V4GuzqN5l5GEv/1rMjaHXmr/r8i+sLgOppO6/8MO0ETI7f33Vt
+# Y5E90Z1WTk+/gFcioXgRMiF670EKsT/7qMykXcGhiJtXcVZOSEXAQsmbdlsKgEhr
+# /Xmfwb1tbWrJUnMTDXpQzTGCGgwwghoIAgEBMIGVMH4xCzAJBgNVBAYTAlVTMRMw
+# EQYDVQQIEwpXYXNoaW5ndG9uMRAwDgYDVQQHEwdSZWRtb25kMR4wHAYDVQQKExVN
+# aWNyb3NvZnQgQ29ycG9yYXRpb24xKDAmBgNVBAMTH01pY3Jvc29mdCBDb2RlIFNp
+# Z25pbmcgUENBIDIwMTECEzMAAASFXpnsDlkvzdcAAAAABIUwDQYJYIZIAWUDBAIB
+# BQCgga4wGQYJKoZIhvcNAQkDMQwGCisGAQQBgjcCAQQwHAYKKwYBBAGCNwIBCzEO
+# MAwGCisGAQQBgjcCARUwLwYJKoZIhvcNAQkEMSIEIPVZ2omrb9w0oPgEV49KKiLz
+# Hy9tWODFYN5enWZBO1tXMEIGCisGAQQBgjcCAQwxNDAyoBSAEgBNAGkAYwByAG8A
+# cwBvAGYAdKEagBhodHRwOi8vd3d3Lm1pY3Jvc29mdC5jb20wDQYJKoZIhvcNAQEB
+# BQAEggEAIyJJX5NE+YCiI4T/R63ISWvC4etwuJ6GNAGw8himKyS92M8mE52Zkxoi
+# +VBGA8rOWs92nAV0ppINQR9WfieaRw97DVFQzgvMtP9935Kr3FBoVMIDO+9jjB26
+# +bcPC4ejsfNh1RPZn7iBqdjCWBJXqs01F7RqNd8R2kfjomkUPD9R8xAo+gj/k1Ym
+# MIbL5FZxc0yJL6As8cR4BYD47gIdQGTNyVFfIA4p4OG//iPxXPPSKX6V/uQeN3PZ
+# i4BhY56sxg6Q48JuIQotlKnN4ZYImw/p3KdXIF3oAD+YyJvOFiP7ptLyehm7vN3u
+# WwnVFY3wjOwVKsK8n0xL8fwGsq79VKGCF5YwgheSBgorBgEEAYI3AwMBMYIXgjCC
+# F34GCSqGSIb3DQEHAqCCF28wghdrAgEDMQ8wDQYJYIZIAWUDBAIBBQAwggFRBgsq
+# hkiG9w0BCRABBKCCAUAEggE8MIIBOAIBAQYKKwYBBAGEWQoDATAxMA0GCWCGSAFl
+# AwQCAQUABCDL5Xp/fJIcdQ+MRRbVtKk96psNOV5SuBFQbASuEoToHwIGaW+9JVkk
+# GBIyMDI2MDEyNzA3NDAwMS40N1owBIACAfSggdGkgc4wgcsxCzAJBgNVBAYTAlVT
+# MRMwEQYDVQQIEwpXYXNoaW5ndG9uMRAwDgYDVQQHEwdSZWRtb25kMR4wHAYDVQQK
+# ExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xJTAjBgNVBAsTHE1pY3Jvc29mdCBBbWVy
+# aWNhIE9wZXJhdGlvbnMxJzAlBgNVBAsTHm5TaGllbGQgVFNTIEVTTjpGMDAyLTA1
+# RTAtRDk0NzElMCMGA1UEAxMcTWljcm9zb2Z0IFRpbWUtU3RhbXAgU2VydmljZaCC
+# Ee0wggcgMIIFCKADAgECAhMzAAACBTx1bIJEh83+AAEAAAIFMA0GCSqGSIb3DQEB
+# CwUAMHwxCzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpXYXNoaW5ndG9uMRAwDgYDVQQH
+# EwdSZWRtb25kMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xJjAkBgNV
+# BAMTHU1pY3Jvc29mdCBUaW1lLVN0YW1wIFBDQSAyMDEwMB4XDTI1MDEzMDE5NDI0
+# OVoXDTI2MDQyMjE5NDI0OVowgcsxCzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpXYXNo
+# aW5ndG9uMRAwDgYDVQQHEwdSZWRtb25kMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29y
+# cG9yYXRpb24xJTAjBgNVBAsTHE1pY3Jvc29mdCBBbWVyaWNhIE9wZXJhdGlvbnMx
+# JzAlBgNVBAsTHm5TaGllbGQgVFNTIEVTTjpGMDAyLTA1RTAtRDk0NzElMCMGA1UE
+# AxMcTWljcm9zb2Z0IFRpbWUtU3RhbXAgU2VydmljZTCCAiIwDQYJKoZIhvcNAQEB
+# BQADggIPADCCAgoCggIBAJKS8t93uAXWvbAZ3LzkIVhcdQLzLATIPgtEu/RZgRd5
+# 5nS7li4runZxdXNCZk84dM3xNaobZI+VRv7s+V3MUMMCVHe9TymI6OaG72sdbjcz
+# Z1uiv2OX2CW6HPBR3ZJyJUZrt/23ru0zcoUpFIxcW0coXcrAEHtpWj5vWrLmn0Na
+# WjY3kUasGocwRWU3LOt4digMsv6bx9Kyoy7+JhSrHMrkXhLshjk16YAHwH4DdCDB
+# UiLrgokh94plR6JYoJN/ih1SA/cBCKXGHjw/rPsBPggDR0wS0qFgsWzhb8o0Myxi
+# vsqlA8pUJwLkTy4Md0p7C5vLN6eRPHLh9/U3eDzKGjk+L0F+NHRXK2uSakN96nwk
+# /BxvgE04hc6jWl90dnwS+dHskVkVCKqkxkWU7kIC5Ngfy6Nzk9QeVowAnw0Rr1MU
+# lM5IGsHs9GB6H/o0nbG73LE+H+RU30Eayz3cwLpSOmjF4zjHvRvBvCIrxI0cg7wP
+# xyqXtVJ69RhuM3g2iAUXCEEKWGh0T/N4Y+rrLqLEPjPrkgdjfPAVBsFVf/D4v9Uc
+# 2f8EwazY8YeeVGM78qTw0ik3iyGQVCoDV8zTx+usNI0Rj1UoO2mxSkAXnVjWhDq0
+# mFYzV3ed4JeHpv/o35d4c5ELCdjzcr6kUwyGDyKxdBvopGXrmSDxdgF3gnCRsqhV
+# AgMBAAGjggFJMIIBRTAdBgNVHQ4EFgQUdHpauzbtvr7IndsRn2jk10vVsvAwHwYD
+# VR0jBBgwFoAUn6cVXQBeYl2D9OXSZacbUzUZ6XIwXwYDVR0fBFgwVjBUoFKgUIZO
+# aHR0cDovL3d3dy5taWNyb3NvZnQuY29tL3BraW9wcy9jcmwvTWljcm9zb2Z0JTIw
+# VGltZS1TdGFtcCUyMFBDQSUyMDIwMTAoMSkuY3JsMGwGCCsGAQUFBwEBBGAwXjBc
+# BggrBgEFBQcwAoZQaHR0cDovL3d3dy5taWNyb3NvZnQuY29tL3BraW9wcy9jZXJ0
+# cy9NaWNyb3NvZnQlMjBUaW1lLVN0YW1wJTIwUENBJTIwMjAxMCgxKS5jcnQwDAYD
+# VR0TAQH/BAIwADAWBgNVHSUBAf8EDDAKBggrBgEFBQcDCDAOBgNVHQ8BAf8EBAMC
+# B4AwDQYJKoZIhvcNAQELBQADggIBAA67GTjtvWLvlXzVPHrGjXTE0ivjNnFhV+QX
+# lMWraSd08eDNXIueyzD8cqQRlEKBlWmQoQnpjiO8bm26AyL5aO3uFQxKKmT5GkHm
+# AVC+HXGYAQvZ+V6DNNYSyePTCsRKmUjlne+B/Z4ZcCv9FyoaNKmi4dsPYdj1jcXQ
+# 6XoVEMJX8cQYpEfOfYzmtCkUZKNpxPgOSpViZ6b8Cs59K9WiOcoQhb3XhTEa26El
+# Kv2M6jlGpNfsYipu283vOFaV36LdfF2F01x+VDP1iGgWpB7EF6eghGAA8C3AfrzF
+# zOv0swLeX0AsSmey87RGIo9cXiXbb859wV99qmGeX9MPCSIl/E7IAx9QXfEj37eL
+# NPVZfYIWzZFo4Crd1yiHInD7FEbQTzCQIeqRXnsFtQETMtfwv2UYnUOjFg2mgNfu
+# JDMn1B2TKmLl+/vvcTcKHwD62jF4WnoWJ9BnIJzwhwgGUfJqToxtPphNVA2BD+Hw
+# UX5Lk6o/sIQIW8gfYq3Y/QaU670LQF9qyGdOOh2a1kVmym1S+KuT/Yc4suMGIyMP
+# AmxAAUDMm7Phm1PKiuu8RHXQaX+ZuZWIeqG80AJ9PM+It+MODK+n2zv9se78JqUq
+# Z6IlQsaOH+XACPnfX2mCCwYmpuEngVsVz6hTnN99ub+sqNVnyTE0PeKbXRCnjWfa
+# 3+qnI/oRMIIHcTCCBVmgAwIBAgITMwAAABXF52ueAptJmQAAAAAAFTANBgkqhkiG
+# 9w0BAQsFADCBiDELMAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24xEDAO
+# BgNVBAcTB1JlZG1vbmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjEy
+# MDAGA1UEAxMpTWljcm9zb2Z0IFJvb3QgQ2VydGlmaWNhdGUgQXV0aG9yaXR5IDIw
+# MTAwHhcNMjEwOTMwMTgyMjI1WhcNMzAwOTMwMTgzMjI1WjB8MQswCQYDVQQGEwJV
+# UzETMBEGA1UECBMKV2FzaGluZ3RvbjEQMA4GA1UEBxMHUmVkbW9uZDEeMBwGA1UE
+# ChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMSYwJAYDVQQDEx1NaWNyb3NvZnQgVGlt
+# ZS1TdGFtcCBQQ0EgMjAxMDCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIB
+# AOThpkzntHIhC3miy9ckeb0O1YLT/e6cBwfSqWxOdcjKNVf2AX9sSuDivbk+F2Az
+# /1xPx2b3lVNxWuJ+Slr+uDZnhUYjDLWNE893MsAQGOhgfWpSg0S3po5GawcU88V2
+# 9YZQ3MFEyHFcUTE3oAo4bo3t1w/YJlN8OWECesSq/XJprx2rrPY2vjUmZNqYO7oa
+# ezOtgFt+jBAcnVL+tuhiJdxqD89d9P6OU8/W7IVWTe/dvI2k45GPsjksUZzpcGkN
+# yjYtcI4xyDUoveO0hyTD4MmPfrVUj9z6BVWYbWg7mka97aSueik3rMvrg0XnRm7K
+# MtXAhjBcTyziYrLNueKNiOSWrAFKu75xqRdbZ2De+JKRHh09/SDPc31BmkZ1zcRf
+# NN0Sidb9pSB9fvzZnkXftnIv231fgLrbqn427DZM9ituqBJR6L8FA6PRc6ZNN3SU
+# HDSCD/AQ8rdHGO2n6Jl8P0zbr17C89XYcz1DTsEzOUyOArxCaC4Q6oRRRuLRvWoY
+# WmEBc8pnol7XKHYC4jMYctenIPDC+hIK12NvDMk2ZItboKaDIV1fMHSRlJTYuVD5
+# C4lh8zYGNRiER9vcG9H9stQcxWv2XFJRXRLbJbqvUAV6bMURHXLvjflSxIUXk8A8
+# FdsaN8cIFRg/eKtFtvUeh17aj54WcmnGrnu3tz5q4i6tAgMBAAGjggHdMIIB2TAS
+# BgkrBgEEAYI3FQEEBQIDAQABMCMGCSsGAQQBgjcVAgQWBBQqp1L+ZMSavoKRPEY1
+# Kc8Q/y8E7jAdBgNVHQ4EFgQUn6cVXQBeYl2D9OXSZacbUzUZ6XIwXAYDVR0gBFUw
+# UzBRBgwrBgEEAYI3TIN9AQEwQTA/BggrBgEFBQcCARYzaHR0cDovL3d3dy5taWNy
+# b3NvZnQuY29tL3BraW9wcy9Eb2NzL1JlcG9zaXRvcnkuaHRtMBMGA1UdJQQMMAoG
+# CCsGAQUFBwMIMBkGCSsGAQQBgjcUAgQMHgoAUwB1AGIAQwBBMAsGA1UdDwQEAwIB
+# hjAPBgNVHRMBAf8EBTADAQH/MB8GA1UdIwQYMBaAFNX2VsuP6KJcYmjRPZSQW9fO
+# mhjEMFYGA1UdHwRPME0wS6BJoEeGRWh0dHA6Ly9jcmwubWljcm9zb2Z0LmNvbS9w
+# a2kvY3JsL3Byb2R1Y3RzL01pY1Jvb0NlckF1dF8yMDEwLTA2LTIzLmNybDBaBggr
+# BgEFBQcBAQROMEwwSgYIKwYBBQUHMAKGPmh0dHA6Ly93d3cubWljcm9zb2Z0LmNv
+# bS9wa2kvY2VydHMvTWljUm9vQ2VyQXV0XzIwMTAtMDYtMjMuY3J0MA0GCSqGSIb3
+# DQEBCwUAA4ICAQCdVX38Kq3hLB9nATEkW+Geckv8qW/qXBS2Pk5HZHixBpOXPTEz
+# tTnXwnE2P9pkbHzQdTltuw8x5MKP+2zRoZQYIu7pZmc6U03dmLq2HnjYNi6cqYJW
+# AAOwBb6J6Gngugnue99qb74py27YP0h1AdkY3m2CDPVtI1TkeFN1JFe53Z/zjj3G
+# 82jfZfakVqr3lbYoVSfQJL1AoL8ZthISEV09J+BAljis9/kpicO8F7BUhUKz/Aye
+# ixmJ5/ALaoHCgRlCGVJ1ijbCHcNhcy4sa3tuPywJeBTpkbKpW99Jo3QMvOyRgNI9
+# 5ko+ZjtPu4b6MhrZlvSP9pEB9s7GdP32THJvEKt1MMU0sHrYUP4KWN1APMdUbZ1j
+# dEgssU5HLcEUBHG/ZPkkvnNtyo4JvbMBV0lUZNlz138eW0QBjloZkWsNn6Qo3GcZ
+# KCS6OEuabvshVGtqRRFHqfG3rsjoiV5PndLQTHa1V1QJsWkBRH58oWFsc/4Ku+xB
+# Zj1p/cvBQUl+fpO+y/g75LcVv7TOPqUxUYS8vwLBgqJ7Fx0ViY1w/ue10CgaiQuP
+# Ntq6TPmb/wrpNPgkNWcr4A245oyZ1uEi6vAnQj0llOZ0dFtq0Z4+7X6gMTN9vMvp
+# e784cETRkPHIqzqKOghif9lwY1NNje6CbaUFEMFxBmoQtB1VM1izoXBm8qGCA1Aw
+# ggI4AgEBMIH5oYHRpIHOMIHLMQswCQYDVQQGEwJVUzETMBEGA1UECBMKV2FzaGlu
+# Z3RvbjEQMA4GA1UEBxMHUmVkbW9uZDEeMBwGA1UEChMVTWljcm9zb2Z0IENvcnBv
+# cmF0aW9uMSUwIwYDVQQLExxNaWNyb3NvZnQgQW1lcmljYSBPcGVyYXRpb25zMScw
+# JQYDVQQLEx5uU2hpZWxkIFRTUyBFU046RjAwMi0wNUUwLUQ5NDcxJTAjBgNVBAMT
+# HE1pY3Jvc29mdCBUaW1lLVN0YW1wIFNlcnZpY2WiIwoBATAHBgUrDgMCGgMVANWw
+# f2nW0mf6SvAIy+o6FW9ett60oIGDMIGApH4wfDELMAkGA1UEBhMCVVMxEzARBgNV
+# BAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1vbmQxHjAcBgNVBAoTFU1pY3Jv
+# c29mdCBDb3Jwb3JhdGlvbjEmMCQGA1UEAxMdTWljcm9zb2Z0IFRpbWUtU3RhbXAg
+# UENBIDIwMTAwDQYJKoZIhvcNAQELBQACBQDtIsxIMCIYDzIwMjYwMTI3MDUzMTUy
+# WhgPMjAyNjAxMjgwNTMxNTJaMHcwPQYKKwYBBAGEWQoEATEvMC0wCgIFAO0izEgC
+# AQAwCgIBAAICDi8CAf8wBwIBAAICEi4wCgIFAO0kHcgCAQAwNgYKKwYBBAGEWQoE
+# AjEoMCYwDAYKKwYBBAGEWQoDAqAKMAgCAQACAwehIKEKMAgCAQACAwGGoDANBgkq
+# hkiG9w0BAQsFAAOCAQEAK6VPvROULEImsXy3q1IkfserHhQluScdLy/hv2C7yrJP
+# O4K1WJJjNhO10g/a0XBgcfrgDuxVwwqDVZnK7F7o5Vdbhkea/bSXOVaZnEQTdgGW
+# Pz/aSItURDB/TpApI8g2B26sJQBLMZQy1CNn675c6o/HuLyDO41kyjBoqcUIUVa9
+# qqXNqazZ3HH6Dj4iIpuyKDQuwzKnXHnpRORXzyh0BRcHw321FgcmQkCAyroGn0qQ
+# hD7mi5B97Yl3drjly3pUwJkq+fND4oNb3LIccOCKpS0X7nUWb01IzLqeLPwTI/ms
+# qvyKrgHQGjlhp401f3VnZhbIitrXdiNndPMrPh9PazGCBA0wggQJAgEBMIGTMHwx
+# CzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpXYXNoaW5ndG9uMRAwDgYDVQQHEwdSZWRt
+# b25kMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xJjAkBgNVBAMTHU1p
+# Y3Jvc29mdCBUaW1lLVN0YW1wIFBDQSAyMDEwAhMzAAACBTx1bIJEh83+AAEAAAIF
+# MA0GCWCGSAFlAwQCAQUAoIIBSjAaBgkqhkiG9w0BCQMxDQYLKoZIhvcNAQkQAQQw
+# LwYJKoZIhvcNAQkEMSIEIOtE/shB51o+mwRsNw3ibKHN9vgz9bUZUTUr7GunYnKP
+# MIH6BgsqhkiG9w0BCRACLzGB6jCB5zCB5DCBvQQggA0DPdx5jS6aF1YtHawmmrQ4
+# +q0kNMBhGaMdWTARb0gwgZgwgYCkfjB8MQswCQYDVQQGEwJVUzETMBEGA1UECBMK
+# V2FzaGluZ3RvbjEQMA4GA1UEBxMHUmVkbW9uZDEeMBwGA1UEChMVTWljcm9zb2Z0
+# IENvcnBvcmF0aW9uMSYwJAYDVQQDEx1NaWNyb3NvZnQgVGltZS1TdGFtcCBQQ0Eg
+# MjAxMAITMwAAAgU8dWyCRIfN/gABAAACBTAiBCDg/w39598p8B18vU83uFb3bKPH
+# HCYuzKRveoSPVzzNTzANBgkqhkiG9w0BAQsFAASCAgBIVP3UWV6CNp1otNb6FdgB
+# fGYs1IAEAp6V7a2ETxUsbmIRI7twAzHaeOTVYXSbKjkAfVSlovl/pibw8Ew0iBky
+# l49T2wl3FYcZnxTHPwHp4DWm0klWP6qthA94OZ+hRNCdymiCpyKepD7XadV5M5PR
+# GDUKO8LA+LKEoEo0+At1SlyD0o6iy/asqG92XklU3On6PK97u+kOEK3aTcL9y8hR
+# fiysJO4xAY7fnynRMyOELb5pCUbb6b1el3F1qlVlayzJ+xUht9yKBBspBfwLSAbl
+# 7IFNPKcLO1m9XpIya8hjB+joFh/Sur4GzWBkYpNscQVRfp8H5+a0TKPAAPzgraA+
+# U9L1wxdiQtEvYll3pg0MVenfDoZE86Z3hf/RE0jXPwSxUshpX7i0pxQmIgUDPiVw
+# TMrzYVB6gmcX9fWfOJRNFmond6s0gpeVwtQJkmdlHTRO2yUPC55sjv2QhTH6oacU
+# ZXcOz4rpGNzQmOfFFIcikeshZZy13ZdsdyXNdhIcQUmIx3CFUseZtinigqTjr6Xt
+# QfwLzXTKHEB/cfVeXBpuGanHTQwouITyKRoibTLkPWdJ+i45k1yuf++nb+3fZIAT
+# o5V6t2icYAQCpQdWfMu26o0h6gP6i/f6fbyval5OvWiQuOnLXu1Yb36G9n0nke9R
+# esZqYxeTv0IsMsoW8/yG6w==
+# SIG # End signature block

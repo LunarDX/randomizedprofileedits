@@ -1,0 +1,286 @@
+<Objs Version="1.1.0.1" xmlns="http://schemas.microsoft.com/powershell/2004/04">
+  <Obj RefId="0">
+    <TN RefId="0">
+      <T>Microsoft.PowerShell.Commands.PSRepositoryItemInfo</T>
+      <T>System.Management.Automation.PSCustomObject</T>
+      <T>System.Object</T>
+    </TN>
+    <MS>
+      <S N="Name">Az.DataMigration</S>
+      <Version N="Version">1.0.0</Version>
+      <S N="Type">Module</S>
+      <S N="Description">Microsoft Azure PowerShell - Database Migration Service cmdlets for Azure Sql in Windows PowerShell and PowerShell Core._x000D__x000A__x000D__x000A_For more information on Database Migration Service, please visit the following: https://learn.microsoft.com/azure/dms/dms-overview</S>
+      <S N="Author">Microsoft Corporation</S>
+      <S N="CompanyName">azure-sdk</S>
+      <S N="Copyright">Microsoft Corporation. All rights reserved.</S>
+      <DT N="PublishedDate">2025-10-14T02:54:29-07:00</DT>
+      <Obj N="InstalledDate" RefId="1">
+        <DT>2026-01-26T20:45:44.4744199-08:00</DT>
+        <MS>
+          <Obj N="DisplayHint" RefId="2">
+            <TN RefId="1">
+              <T>Deserialized.Microsoft.PowerShell.Commands.DisplayHintType</T>
+              <T>Deserialized.System.Enum</T>
+              <T>Deserialized.System.ValueType</T>
+              <T>Deserialized.System.Object</T>
+            </TN>
+            <ToString>DateTime</ToString>
+            <I32>2</I32>
+          </Obj>
+        </MS>
+      </Obj>
+      <Obj N="UpdatedDate" RefId="3">
+        <DT>2026-03-10T16:48:02.5565027-07:00</DT>
+        <MS>
+          <Obj N="DisplayHint" RefId="4">
+            <TN RefId="2">
+              <T>Microsoft.PowerShell.Commands.DisplayHintType</T>
+              <T>System.Enum</T>
+              <T>System.ValueType</T>
+              <T>System.Object</T>
+            </TN>
+            <ToString>DateTime</ToString>
+            <I32>2</I32>
+          </Obj>
+        </MS>
+      </Obj>
+      <URI N="LicenseUri">https://aka.ms/azps-license</URI>
+      <URI N="ProjectUri">https://github.com/Azure/azure-powershell</URI>
+      <Nil N="IconUri" />
+      <Obj N="Tags" RefId="5">
+        <TN RefId="3">
+          <T>System.Object[]</T>
+          <T>System.Array</T>
+          <T>System.Object</T>
+        </TN>
+        <LST>
+          <S>Azure</S>
+          <S>ResourceManager</S>
+          <S>ARM</S>
+          <S>Sql</S>
+          <S>Database</S>
+          <S>Data</S>
+          <S>Migration</S>
+          <S>Service</S>
+          <S>PSModule</S>
+          <S>PSEdition_Core</S>
+          <S>PSEdition_Desktop</S>
+        </LST>
+      </Obj>
+      <Obj N="Includes" RefId="6">
+        <TN RefId="4">
+          <T>System.Collections.Hashtable</T>
+          <T>System.Object</T>
+        </TN>
+        <DCT>
+          <En>
+            <S N="Key">RoleCapability</S>
+            <Obj N="Value" RefId="7">
+              <TNRef RefId="3" />
+              <LST />
+            </Obj>
+          </En>
+          <En>
+            <S N="Key">Workflow</S>
+            <Ref N="Value" RefId="7" />
+          </En>
+          <En>
+            <S N="Key">Command</S>
+            <Obj N="Value" RefId="8">
+              <TNRef RefId="3" />
+              <LST>
+                <S>Get-AzDataMigrationProject</S>
+                <S>Get-AzDataMigrationService</S>
+                <S>Get-AzDataMigrationTask</S>
+                <S>Invoke-AzDataMigrationCommand</S>
+                <S>New-AzDataMigrationAzureActiveDirectoryApp</S>
+                <S>New-AzDataMigrationConnectionInfo</S>
+                <S>New-AzDataMigrationDatabaseInfo</S>
+                <S>New-AzDataMigrationFileShare</S>
+                <S>New-AzDataMigrationMongoDbCollectionSetting</S>
+                <S>New-AzDataMigrationMongoDbDatabaseSetting</S>
+                <S>New-AzDataMigrationProject</S>
+                <S>New-AzDataMigrationSelectedDBObject</S>
+                <S>New-AzDataMigrationService</S>
+                <S>New-AzDataMigrationSyncSelectedDBObject</S>
+                <S>New-AzDataMigrationTask</S>
+                <S>Remove-AzDataMigrationProject</S>
+                <S>Remove-AzDataMigrationService</S>
+                <S>Remove-AzDataMigrationTask</S>
+                <S>Start-AzDataMigrationService</S>
+                <S>Stop-AzDataMigrationService</S>
+                <S>Stop-AzDataMigrationTask</S>
+                <S>Get-AzDataMigrationAssessment</S>
+                <S>Get-AzDataMigrationPerformanceDataCollection</S>
+                <S>Get-AzDataMigrationSkuRecommendation</S>
+                <S>Get-AzDataMigrationSqlService</S>
+                <S>Get-AzDataMigrationSqlServiceAuthKey</S>
+                <S>Get-AzDataMigrationSqlServiceIntegrationRuntimeMetric</S>
+                <S>Get-AzDataMigrationSqlServiceMigration</S>
+                <S>Get-AzDataMigrationToSqlDb</S>
+                <S>Get-AzDataMigrationToSqlManagedInstance</S>
+                <S>Get-AzDataMigrationToSqlVM</S>
+                <S>Invoke-AzDataMigrationCutoverToSqlManagedInstance</S>
+                <S>Invoke-AzDataMigrationCutoverToSqlVM</S>
+                <S>Invoke-AzDataMigrationRetryToSqlDb</S>
+                <S>New-AzDataMigrationLoginsMigration</S>
+                <S>New-AzDataMigrationSqlServerSchema</S>
+                <S>New-AzDataMigrationSqlService</S>
+                <S>New-AzDataMigrationSqlServiceAuthKey</S>
+                <S>New-AzDataMigrationTdeCertificateMigration</S>
+                <S>New-AzDataMigrationToSqlDb</S>
+                <S>New-AzDataMigrationToSqlManagedInstance</S>
+                <S>New-AzDataMigrationToSqlVM</S>
+                <S>Register-AzDataMigrationIntegrationRuntime</S>
+                <S>Remove-AzDataMigrationSqlService</S>
+                <S>Remove-AzDataMigrationSqlServiceNode</S>
+                <S>Remove-AzDataMigrationToSqlDb</S>
+                <S>Remove-AzDataMigrationToSqlManagedInstance</S>
+                <S>Remove-AzDataMigrationToSqlVM</S>
+                <S>Stop-AzDataMigrationToSqlDb</S>
+                <S>Stop-AzDataMigrationToSqlManagedInstance</S>
+                <S>Stop-AzDataMigrationToSqlVM</S>
+                <S>Update-AzDataMigrationSqlService</S>
+              </LST>
+            </Obj>
+          </En>
+          <En>
+            <S N="Key">DscResource</S>
+            <Ref N="Value" RefId="7" />
+          </En>
+          <En>
+            <S N="Key">Function</S>
+            <Obj N="Value" RefId="9">
+              <TNRef RefId="3" />
+              <LST>
+                <S>Get-AzDataMigrationAssessment</S>
+                <S>Get-AzDataMigrationPerformanceDataCollection</S>
+                <S>Get-AzDataMigrationSkuRecommendation</S>
+                <S>Get-AzDataMigrationSqlService</S>
+                <S>Get-AzDataMigrationSqlServiceAuthKey</S>
+                <S>Get-AzDataMigrationSqlServiceIntegrationRuntimeMetric</S>
+                <S>Get-AzDataMigrationSqlServiceMigration</S>
+                <S>Get-AzDataMigrationToSqlDb</S>
+                <S>Get-AzDataMigrationToSqlManagedInstance</S>
+                <S>Get-AzDataMigrationToSqlVM</S>
+                <S>Invoke-AzDataMigrationCutoverToSqlManagedInstance</S>
+                <S>Invoke-AzDataMigrationCutoverToSqlVM</S>
+                <S>Invoke-AzDataMigrationRetryToSqlDb</S>
+                <S>New-AzDataMigrationLoginsMigration</S>
+                <S>New-AzDataMigrationSqlServerSchema</S>
+                <S>New-AzDataMigrationSqlService</S>
+                <S>New-AzDataMigrationSqlServiceAuthKey</S>
+                <S>New-AzDataMigrationTdeCertificateMigration</S>
+                <S>New-AzDataMigrationToSqlDb</S>
+                <S>New-AzDataMigrationToSqlManagedInstance</S>
+                <S>New-AzDataMigrationToSqlVM</S>
+                <S>Register-AzDataMigrationIntegrationRuntime</S>
+                <S>Remove-AzDataMigrationSqlService</S>
+                <S>Remove-AzDataMigrationSqlServiceNode</S>
+                <S>Remove-AzDataMigrationToSqlDb</S>
+                <S>Remove-AzDataMigrationToSqlManagedInstance</S>
+                <S>Remove-AzDataMigrationToSqlVM</S>
+                <S>Stop-AzDataMigrationToSqlDb</S>
+                <S>Stop-AzDataMigrationToSqlManagedInstance</S>
+                <S>Stop-AzDataMigrationToSqlVM</S>
+                <S>Update-AzDataMigrationSqlService</S>
+              </LST>
+            </Obj>
+          </En>
+          <En>
+            <S N="Key">Cmdlet</S>
+            <Obj N="Value" RefId="10">
+              <TNRef RefId="3" />
+              <LST>
+                <S>Get-AzDataMigrationProject</S>
+                <S>Get-AzDataMigrationService</S>
+                <S>Get-AzDataMigrationTask</S>
+                <S>Invoke-AzDataMigrationCommand</S>
+                <S>New-AzDataMigrationAzureActiveDirectoryApp</S>
+                <S>New-AzDataMigrationConnectionInfo</S>
+                <S>New-AzDataMigrationDatabaseInfo</S>
+                <S>New-AzDataMigrationFileShare</S>
+                <S>New-AzDataMigrationMongoDbCollectionSetting</S>
+                <S>New-AzDataMigrationMongoDbDatabaseSetting</S>
+                <S>New-AzDataMigrationProject</S>
+                <S>New-AzDataMigrationSelectedDBObject</S>
+                <S>New-AzDataMigrationService</S>
+                <S>New-AzDataMigrationSyncSelectedDBObject</S>
+                <S>New-AzDataMigrationTask</S>
+                <S>Remove-AzDataMigrationProject</S>
+                <S>Remove-AzDataMigrationService</S>
+                <S>Remove-AzDataMigrationTask</S>
+                <S>Start-AzDataMigrationService</S>
+                <S>Stop-AzDataMigrationService</S>
+                <S>Stop-AzDataMigrationTask</S>
+              </LST>
+            </Obj>
+          </En>
+        </DCT>
+      </Obj>
+      <Nil N="PowerShellGetFormatVersion" />
+      <S N="ReleaseNotes">* General availability for module Az.DataMigration_x000D__x000A_* Upgraded Data Migration API to stable version '2025-06-30'._x000D__x000A_* Added support for retrying database migrations and for deleting SQL VM and SQL MI Database Migration Services._x000D__x000A_* Added cmdlets: 'Invoke-AzDataMigrationRetryToSqlDb', 'Remove-AzDataMigrationToSqlManagedInstance', 'Remove-AzDataMigrationToSqlVM'</S>
+      <Obj N="Dependencies" RefId="11">
+        <TNRef RefId="3" />
+        <LST>
+          <Obj RefId="12">
+            <TN RefId="5">
+              <T>System.Collections.Specialized.OrderedDictionary</T>
+              <T>System.Object</T>
+            </TN>
+            <DCT>
+              <En>
+                <S N="Key">Name</S>
+                <S N="Value">Az.Accounts</S>
+              </En>
+              <En>
+                <S N="Key">MinimumVersion</S>
+                <S N="Value">5.3.0</S>
+              </En>
+              <En>
+                <S N="Key">CanonicalId</S>
+                <S N="Value">nuget:Az.Accounts/5.3.0</S>
+              </En>
+            </DCT>
+          </Obj>
+        </LST>
+      </Obj>
+      <S N="RepositorySourceLocation">https://www.powershellgallery.com/api/v2</S>
+      <S N="Repository">PSGallery</S>
+      <S N="PackageManagementProvider">NuGet</S>
+      <Obj N="AdditionalMetadata" RefId="13">
+        <TN RefId="6">
+          <T>System.Management.Automation.PSCustomObject</T>
+          <T>System.Object</T>
+        </TN>
+        <MS>
+          <S N="copyright">Microsoft Corporation. All rights reserved.</S>
+          <S N="description">Microsoft Azure PowerShell - Database Migration Service cmdlets for Azure Sql in Windows PowerShell and PowerShell Core._x000D__x000A__x000D__x000A_For more information on Database Migration Service, please visit the following: https://learn.microsoft.com/azure/dms/dms-overview</S>
+          <S N="requireLicenseAcceptance">True</S>
+          <S N="releaseNotes">* General availability for module Az.DataMigration_x000D__x000A_* Upgraded Data Migration API to stable version '2025-06-30'._x000D__x000A_* Added support for retrying database migrations and for deleting SQL VM and SQL MI Database Migration Services._x000D__x000A_* Added cmdlets: 'Invoke-AzDataMigrationRetryToSqlDb', 'Remove-AzDataMigrationToSqlManagedInstance', 'Remove-AzDataMigrationToSqlVM'</S>
+          <S N="isLatestVersion">True</S>
+          <S N="isAbsoluteLatestVersion">True</S>
+          <S N="versionDownloadCount">27484660</S>
+          <S N="downloadCount">27532105</S>
+          <S N="packageSize">979354</S>
+          <S N="published">10/14/2025 2:54:29 AM -07:00</S>
+          <S N="created">10/14/2025 2:54:29 AM -07:00</S>
+          <S N="lastUpdated">3/5/2026 5:40:13 PM -08:00</S>
+          <S N="tags">Azure ResourceManager ARM Sql Database Data Migration Service PSModule PSEdition_Core PSEdition_Desktop PSCmdlet_Get-AzDataMigrationProject PSCommand_Get-AzDataMigrationProject PSCmdlet_Get-AzDataMigrationService PSCommand_Get-AzDataMigrationService PSCmdlet_Get-AzDataMigrationTask PSCommand_Get-AzDataMigrationTask PSCmdlet_Invoke-AzDataMigrationCommand PSCommand_Invoke-AzDataMigrationCommand PSCmdlet_New-AzDataMigrationAzureActiveDirectoryApp PSCommand_New-AzDataMigrationAzureActiveDirectoryApp PSCmdlet_New-AzDataMigrationConnectionInfo PSCommand_New-AzDataMigrationConnectionInfo PSCmdlet_New-AzDataMigrationDatabaseInfo PSCommand_New-AzDataMigrationDatabaseInfo PSCmdlet_New-AzDataMigrationFileShare PSCommand_New-AzDataMigrationFileShare PSCmdlet_New-AzDataMigrationMongoDbCollectionSetting PSCommand_New-AzDataMigrationMongoDbCollectionSetting PSCmdlet_New-AzDataMigrationMongoDbDatabaseSetting PSCommand_New-AzDataMigrationMongoDbDatabaseSetting PSCmdlet_New-AzDataMigrationProject PSCommand_New-AzDataMigrationProject PSCmdlet_New-AzDataMigrationSelectedDBObject PSCommand_New-AzDataMigrationSelectedDBObject PSCmdlet_New-AzDataMigrationService PSCommand_New-AzDataMigrationService PSCmdlet_New-AzDataMigrationSyncSelectedDBObject PSCommand_New-AzDataMigrationSyncSelectedDBObject PSCmdlet_New-AzDataMigrationTask PSCommand_New-AzDataMigrationTask PSCmdlet_Remove-AzDataMigrationProject PSCommand_Remove-AzDataMigrationProject PSCmdlet_Remove-AzDataMigrationService PSCommand_Remove-AzDataMigrationService PSCmdlet_Remove-AzDataMigrationTask PSCommand_Remove-AzDataMigrationTask PSCmdlet_Start-AzDataMigrationService PSCommand_Start-AzDataMigrationService PSCmdlet_Stop-AzDataMigrationService PSCommand_Stop-AzDataMigrationService PSCmdlet_Stop-AzDataMigrationTask PSCommand_Stop-AzDataMigrationTask PSIncludes_Cmdlet PSFunction_Get-AzDataMigrationAssessment PSCommand_Get-AzDataMigrationAssessment PSFunction_Get-AzDataMigrationPerformanceDataCollection PSCommand_Get-AzDataMigrationPerformanceDataCollection PSFunction_Get-AzDataMigrationSkuRecommendation PSCommand_Get-AzDataMigrationSkuRecommendation PSFunction_Get-AzDataMigrationSqlService PSCommand_Get-AzDataMigrationSqlService PSFunction_Get-AzDataMigrationSqlServiceAuthKey PSCommand_Get-AzDataMigrationSqlServiceAuthKey PSFunction_Get-AzDataMigrationSqlServiceIntegrationRuntimeMetric PSCommand_Get-AzDataMigrationSqlServiceIntegrationRuntimeMetric PSFunction_Get-AzDataMigrationSqlServiceMigration PSCommand_Get-AzDataMigrationSqlServiceMigration PSFunction_Get-AzDataMigrationToSqlDb PSCommand_Get-AzDataMigrationToSqlDb PSFunction_Get-AzDataMigrationToSqlManagedInstance PSCommand_Get-AzDataMigrationToSqlManagedInstance PSFunction_Get-AzDataMigrationToSqlVM PSCommand_Get-AzDataMigrationToSqlVM PSFunction_Invoke-AzDataMigrationCutoverToSqlManagedInstance PSCommand_Invoke-AzDataMigrationCutoverToSqlManagedInstance PSFunction_Invoke-AzDataMigrationCutoverToSqlVM PSCommand_Invoke-AzDataMigrationCutoverToSqlVM PSFunction_Invoke-AzDataMigrationRetryToSqlDb PSCommand_Invoke-AzDataMigrationRetryToSqlDb PSFunction_New-AzDataMigrationLoginsMigration PSCommand_New-AzDataMigrationLoginsMigration PSFunction_New-AzDataMigrationSqlServerSchema PSCommand_New-AzDataMigrationSqlServerSchema PSFunction_New-AzDataMigrationSqlService PSCommand_New-AzDataMigrationSqlService PSFunction_New-AzDataMigrationSqlServiceAuthKey PSCommand_New-AzDataMigrationSqlServiceAuthKey PSFunction_New-AzDataMigrationTdeCertificateMigration PSCommand_New-AzDataMigrationTdeCertificateMigration PSFunction_New-AzDataMigrationToSqlDb PSCommand_New-AzDataMigrationToSqlDb PSFunction_New-AzDataMigrationToSqlManagedInstance PSCommand_New-AzDataMigrationToSqlManagedInstance PSFunction_New-AzDataMigrationToSqlVM PSCommand_New-AzDataMigrationToSqlVM PSFunction_Register-AzDataMigrationIntegrationRuntime PSCommand_Register-AzDataMigrationIntegrationRuntime PSFunction_Remove-AzDataMigrationSqlService PSCommand_Remove-AzDataMigrationSqlService PSFunction_Remove-AzDataMigrationSqlServiceNode PSCommand_Remove-AzDataMigrationSqlServiceNode PSFunction_Remove-AzDataMigrationToSqlDb PSCommand_Remove-AzDataMigrationToSqlDb PSFunction_Remove-AzDataMigrationToSqlManagedInstance PSCommand_Remove-AzDataMigrationToSqlManagedInstance PSFunction_Remove-AzDataMigrationToSqlVM PSCommand_Remove-AzDataMigrationToSqlVM PSFunction_Stop-AzDataMigrationToSqlDb PSCommand_Stop-AzDataMigrationToSqlDb PSFunction_Stop-AzDataMigrationToSqlManagedInstance PSCommand_Stop-AzDataMigrationToSqlManagedInstance PSFunction_Stop-AzDataMigrationToSqlVM PSCommand_Stop-AzDataMigrationToSqlVM PSFunction_Update-AzDataMigrationSqlService PSCommand_Update-AzDataMigrationSqlService PSIncludes_Function</S>
+          <S N="developmentDependency">False</S>
+          <S N="updated">2026-03-05T17:40:13Z</S>
+          <S N="NormalizedVersion">1.0.0</S>
+          <S N="Authors">Microsoft Corporation</S>
+          <S N="IsPrerelease">false</S>
+          <S N="ItemType">Module</S>
+          <S N="FileList">Az.DataMigration.nuspec|Az.DataMigration.psm1|Microsoft.Azure.PowerShell.Cmdlets.DataMigration.dll|Microsoft.Azure.PowerShell.Cmdlets.DataMigration.dll-Help.xml|DataMigration.Autorest\Az.DataMigration.format.ps1xml|DataMigration.Autorest\bin\Az.DataMigration.private.dll|DataMigration.Autorest\custom\Cmdlets\Get-AzDataMigrationAssessment.ps1|DataMigration.Autorest\custom\Cmdlets\Get-AzDataMigrationSkuRecommendation.ps1|DataMigration.Autorest\custom\Cmdlets\New-AzDataMigrationSqlServerSchema.ps1|DataMigration.Autorest\custom\Cmdlets\New-AzDataMigrationToSqlManagedInstance.ps1|DataMigration.Autorest\custom\Helpers\Assessment.ps1|DataMigration.Autorest\custom\Helpers\IRRegister.ps1|DataMigration.Autorest\custom\Helpers\SqlServerSchema.ps1|DataMigration.Autorest\internal\Az.DataMigration.internal.psm1|DataMigration.Autorest\internal\ProxyCmdletDefinitions.ps1|DataMigration.Autorest\utils\Get-SubscriptionIdTestSafe.ps1|DataMigration.Autorest\utils\Unprotect-SecureString.ps1|Az.DataMigration.psd1|Microsoft.Azure.PowerShell.DataMigration.Management.Sdk.dll|DataMigration.Autorest\Az.DataMigration.psm1|DataMigration.Autorest\custom\Az.DataMigration.custom.psm1|DataMigration.Autorest\custom\Cmdlets\Get-AzDataMigrationPerformanceDataCollection.ps1|DataMigration.Autorest\custom\Cmdlets\New-AzDataMigrationLoginsMigration.ps1|DataMigration.Autorest\custom\Cmdlets\New-AzDataMigrationTdeCertificateMigration.ps1|DataMigration.Autorest\custom\Cmdlets\Register-AzDataMigrationIntegrationRuntime.ps1|DataMigration.Autorest\custom\Helpers\common.ps1|DataMigration.Autorest\custom\Helpers\LoginMigrations.ps1|DataMigration.Autorest\exports\ProxyCmdletDefinitions.ps1|.signature.p7s</S>
+          <S N="GUID">9c9b7917-1d7b-4ef2-ba49-ae1e65dc6d3d</S>
+          <S N="PowerShellVersion">5.1</S>
+          <S N="DotNetFrameworkVersion">4.7.2</S>
+          <S N="CompanyName">Microsoft Corporation</S>
+        </MS>
+      </Obj>
+      <S N="InstalledLocation">C:\Users\OmarRugel\Documents\PowerShell\Modules\Az.DataMigration\1.0.0</S>
+    </MS>
+  </Obj>
+</Objs>
