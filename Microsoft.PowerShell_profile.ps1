@@ -487,17 +487,50 @@ $env:PATH += ";C:\Users\OmarRugel\AppData\Local\espanso"
 
 $env:PATH += ";C:\Users\OmarRugel\AppData\Local\Programs\Espanso"
 
-# File: $PROFILE
 Import-Module PSReadLine
-# Alt+T opens fzf and inserts the selected file path
-Set-PSReadLineKeyHandler -Chord 'Ctrl+t' -BriefDescription 'fzf file picker' -ScriptBlock {
+
+# --- fzf + PowerShell 7 configuration ---
+
+# Alt+0 -> pick a file; insert filename after cursor
+Set-PSReadLineKeyHandler -Chord 'Alt+0' -BriefDescription 'fzf insert file path' -ScriptBlock {
     $file = & fzf
     if ($file) {
         [Microsoft.PowerShell.PSConsoleReadLine]::Insert(" $file")
     }
 }
-# Optional helper command: pick and open directly in nvim
-function vf {
-    $file = & fzf
-    if ($file) { nvim -- $file }
+
+# Ctrl+I -> pick a directory; change to it (fast fd-based search)
+Set-PSReadLineKeyHandler -Chord 'Ctrl+I' -BriefDescription 'fzf change directory (fd-based)' -ScriptBlock {
+    try {
+        $dir = fd --type d --hidden --exclude .git 2>$null | fzf
+        if ($dir) { Set-Location $dir }
+    } catch {
+        Write-Host "[WARN] 'fd' not found. Please install it (e.g. scoop install fd)." -ForegroundColor Yellow
+    }
 }
+
+# vf -> open selected file(s) in Neovim
+function vf {
+    $files = & fzf --multi
+    if ($files) { nvim -- $files }
+}
+
+# --- fzf Help Function ---
+function Show-FzfHelp {
+    @"
+FZF Integration Commands
+------------------------
+alt+0   →  Select a file with fzf; inserts its path into current command
+ctrl+i  →  Select a directory with fzf and cd into it
+vf      →  Open one or more selected files directly in Neovim
+fzf-help →  Show this help message
+
+pro tips:
+- press TAB inside fzf to multi-select
+- for faster search, install 'fd': scoop install fd
+- to customize search: Set-Variable FZF_DEFAULT_COMMAND 'fd --type f'
+"@ | Write-Host
+}
+Set-Alias fzf-help Show-FzfHelp
+
+# (Removed startup reminder per user request)
